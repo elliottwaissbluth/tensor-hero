@@ -7,7 +7,7 @@ import pandas as pd
 from music2array import mp3_read
 from music2array import ogg_read
 
-sr, x = ogg_read('guitar_small.ogg') #sr = sample rate, x = data
+sr, x = ogg_read('preprocessing\guitar_small.ogg') #sr = sample rate, x = data
 #print(x[20000:22500])
 print('The sample rate is', sr)
 #x = x*10
