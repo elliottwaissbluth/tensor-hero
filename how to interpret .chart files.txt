@@ -25,7 +25,7 @@ Let's look at this example .chart file:
   Name = "My Song 1"
   Artist = "Elliott Waissbluth"
   Offset = 0
-  Resolution = 192	# Resolution is basically always 192. This is how many ticks there are per bar
+  Resolution = 192	# Resolution is basically always 192. This is how many ticks there are per beat
   Player2 = bass
   Difficulty = 0
   PreviewStart = 0
@@ -41,7 +41,7 @@ Let's look at this example .chart file:
 [Events]			# the song
 {
 }
-[ExpertSingle]		# The following chart has 6 green notes, one every 1/8 bar
+[ExpertSingle]		# The following chart has 6 green notes, one every 1/8 bar, or 1/2 beat
 {
   96 = N 0 0
   192 = N 0 0
