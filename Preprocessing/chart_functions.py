@@ -241,7 +241,16 @@ def chart2onehot(path, print_release_notes=False):
     
     return coded_notes_3
 
-    
+def chart2tensor(path, print_release_notes=False):
+    '''
+    Inputs a path to a chart and returns a tensor with 10ms ticks as indices and one hot
+    representation as values.
+    '''
+    coded_notes = chart2onehot(path, print_release_notes)
+    notes_tensor = np.zeros(max(coded_notes.keys()))
+    for k, v in coded_notes.items():
+        notes_tensor[k-1] = v
+    return notes_tensor
 
 
 def map_notes_0(note_array, note_type):
