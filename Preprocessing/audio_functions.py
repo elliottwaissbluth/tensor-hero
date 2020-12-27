@@ -1,4 +1,5 @@
 import librosa
+import librosa.display
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -26,7 +27,7 @@ def music2tensor(path, display_spectrogram = False):
     mel46 = librosa.filters.mel(44100, n_fft = 1024, n_mels = 81)
     mel23 = librosa.filters.mel(44100, n_fft = 512, n_mels = 81)
 
-    # Transform the STFT matrix to the mel filterbank, reducing dimensionality of columns to 80
+    # Transform the STFT matrix to the mel filterbank, reducing dimensionality of columns to 81
     S_93 = np.matmul(mel93,S_93)
     S_46 = np.matmul(mel46,S_46)
     S_23 = np.matmul(mel23,S_23)
@@ -38,12 +39,26 @@ def music2tensor(path, display_spectrogram = False):
 
     # Prepend and append seven columns of zeros (even the first and last 10ms 
     # windows should have 70ms of prior context and posterior context)
-    append_arr = np.ones((80,7)) * np.min(S93db)
+    append_arr = np.ones((81,7)) * np.min(S93db)
     S93arr = np.c_[append_arr, S93db, append_arr]
     S46arr = np.c_[append_arr, S46db, append_arr]
     S23arr = np.c_[append_arr, S23db, append_arr]
 
-    # Split up the arrays into 80 x 15 tensors representing 150ms of audio context
+    # Convert each frequency band to zero mean and unit variance
+    S93_mean = np.repeat(S93arr.mean(axis=1), S93arr.shape[1]).reshape(81, S93arr.shape[1])
+    S93_std = np.repeat(S93arr.std(axis=1), S93arr.shape[1]).reshape(81, S93arr.shape[1])
+
+    S46_mean = np.repeat(S46arr.mean(axis=1), S46arr.shape[1]).reshape(81, S46arr.shape[1])
+    S46_std = np.repeat(S46arr.std(axis=1), S46arr.shape[1]).reshape(81, S46arr.shape[1])
+
+    S23_mean = np.repeat(S23arr.mean(axis=1), S23arr.shape[1]).reshape(81, S23arr.shape[1])
+    S23_std = np.repeat(S23arr.std(axis=1), S23arr.shape[1]).reshape(81, S23arr.shape[1])
+
+    S93arr = np.nan_to_num(np.divide(np.subtract(S93arr, S93_mean), S93_std))
+    S46arr = np.nan_to_num(np.divide(np.subtract(S46arr, S46_mean), S46_std))
+    S23arr = np.nan_to_num(np.divide(np.subtract(S23arr, S23_mean), S23_std))
+
+    # Split up the arrays into 81 x 15 tensors representing 150ms of audio context
     S93_split = np.array([S93arr[:, i-7 : i+8] for i in range(7, S93arr.shape[1] - 7)])
     S46_split = np.array([S46arr[:, i-7 : i+8] for i in range(7, S46arr.shape[1] - 7)])
     S23_split = np.array([S23arr[:, i-7 : i+8] for i in range(7, S23arr.shape[1] - 7)])
