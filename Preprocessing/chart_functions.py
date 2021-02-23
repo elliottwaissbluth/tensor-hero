@@ -3,6 +3,7 @@ import sys
 import numpy as np
 from pathlib import Path
 from itertools import combinations
+import io
 
 def chart2tensor(path, print_release_notes=False):
     '''
@@ -44,19 +45,35 @@ def chart2dict(path):
     # Parse chart file, populating lists
     i = 0
     for data in raw_chart:
-        if data in ['[Song]', '[SyncTrack]', '[Events]', '[ExpertSingle]']:
-            i += 1
+        if data == '[Song]' or data == 'ï»¿[Song]':
+            i = 1
+        elif data == '[SyncTrack]':
+            i = 2
+        elif data in ['[Events]', '[EasySingle]', '[MediumSingle]','[HardSingle]']:
+            i = 3
+        elif data == '[ExpertSingle]':
+            i = 4
         
-        if data in ['{', '}', '[Song]', '[SyncTrack]', '[Events]', '[ExpertSingle]']:
+        if data in ['{', '}', '[Song]', 'ï»¿[Song]', '[SyncTrack]', '[Events]', '[ExpertSingle]']:
             continue
-        elif i == 1:
-            song.append(data[2:])
-        elif i == 2:
-            synctrack.append(data[2:])
-        elif i == 3:
-            continue
-        elif i == 4:
-            expertsingle.append(data[2:])
+        if data[0] == ' ':
+            if i == 1:
+                song.append(data[2:])
+            elif i == 2:
+                synctrack.append(data[2:])
+            elif i == 3:
+                continue
+            elif i == 4:
+                expertsingle.append(data[2:])
+        else:
+            if i == 1:
+                song.append(data[0:].strip('\t'))
+            elif i == 2:
+                synctrack.append(data[0:].strip('\t'))
+            elif i == 3:
+                continue
+            elif i == 4:
+                expertsingle.append(data[0:].strip('\t'))
 
     time_signatures = {'tick' : [],
                        'TS' : []}
@@ -71,8 +88,14 @@ def chart2dict(path):
         elif line[2] == 'R':
             raise NameError('Error - Resolution changes during this song')
         else:
-            BPMs['tick'].append(int(line[0]))
-            BPMs['BPM'].append(int(line[3]))
+            try:
+                BPMs['tick'].append(int(line[0]))
+                BPMs['BPM'].append(int(line[3]))
+            except:
+                # print(line)
+                # print(expertsingle)
+                # print(time_signatures)
+                raise NameError('Chart file may have improper indentation')
 
     # Parse the 'expertsingle' section of the .chart file for note information
     notes = {'tick' : [],       # What tick the note is at
@@ -82,30 +105,42 @@ def chart2dict(path):
 
     for note in expertsingle:
         line = note.split(' ')
+        if len(line) < 2:
+            break
         if line[2] == 'E':       # skip the lines that mark events
             continue
         else:
-            notes['tick'].append(int(line[0]))
-            notes['N_S'].append(line[2])
-            notes['note'].append(line[3])
-            notes['duration'].append(int(line[4]))
+            if "=" in line:
+                notes['tick'].append(int(line[0]))
+                notes['N_S'].append(line[2])
+                notes['note'].append(line[3])
+                notes['duration'].append(int(line[4]))
+            else:
+                notes['tick'].append(int(line[0]))
+                notes['N_S'].append(line[1])
+                notes['note'].append(line[2])
+                notes['duration'].append(int(line[3]))
 
     # Parse the 'song' section of the .chart file to get relevent chart information
     song_metadata = {'Name' : '',
-                    'Artist' : '',
-                    'Charter' : '',
-                    'Offset' : '',
-                    'Resolution' : '',
-                    'Genre' : '',
-                    'MediaType' : '',
-                    'MusicStream' : ''}
-
-    for data in song:
-        line = data.split(' ')
-        if line[0] in song_metadata.keys():
-            song_metadata[line[0]] = line[-1]
-    song_metadata['Offset'] = int(song_metadata['Offset'])
-    song_metadata['Resolution'] = int(song_metadata['Resolution'])
+                        'Artist' : '',
+                        'Charter' : '',
+                        'Offset' : '',
+                        'Resolution' : '',
+                        'Genre' : '',
+                        'MediaType' : '',
+                        'MusicStream' : ''}
+    if song:
+        for data in song:
+            line = data.split(' ')
+            if line[0] in song_metadata.keys():
+                song_metadata[line[0]] = line[-1]
+        song_metadata['Offset'] = int(float(song_metadata['Offset']))
+        song_metadata['Resolution'] = int(float(song_metadata['Resolution']))
+    else:
+        print('song metadata lost')
+        print(song)
+        song_metadata['Resolution'] = 192
 
     return notes, song_metadata, time_signatures, BPMs
 
@@ -158,14 +193,14 @@ def chart2onehot(path, print_release_notes=False):
 
     # Loop through song one note at a time, processing along the way
     for i in range(len(notes['tick'])):
-        #if notes['N_S'][i] == 'S':  # if the token is a star power indicator, skip it
-        if notes['N_S'] == 'S':  # if the token is a star power indicator, skip it
-            continue
+        # note: This was originally implemented but star power indicators also have note information.
+        # if notes['N_S'] == 'S':  # if the token is a star power indicator, skip it
+        #     continue
 
         if notes['tick'][i] not in coded_notes_0:  # If the key is not in the dictionary
             coded_notes_0[notes['tick'][i]] = []                   # Create empty list
 
-        if notes['duration'][i] == 0:  # If the note is not held
+        if notes['duration'][i] == 0 or int(notes['note'][i]) == 5 or int(notes['note'][i]) == 6:  # If the note is not held
             coded_notes_0[notes['tick'][i]].append(int(notes['note'][i]))  # Add note to list
         else:  # If the note is held
             if (notes['tick'][i] + notes['duration'][i]) not in coded_notes_0:  # If the key is not in the dictionary
@@ -177,13 +212,26 @@ def chart2onehot(path, print_release_notes=False):
             # Add a release key at time step when note will be released.
             # Release key is the code of the note + 20 (so 21 indicates release green, 22 is release red, etc.)
             coded_notes_0[notes['tick'][i] + notes['duration'][i]].append(int(notes['note'][i]) + 20)  # Add note to list
+        
+        if 5 in coded_notes_0[notes['tick'][i]] and 6 in coded_notes_0[notes['tick'][i]]:  # Sometimes there are notes with conflicting force/tap flags. Set these to tap flags
+            # print('Force AND tap flag at tick {}'.format(notes['tick'][i]))
+            coded_notes_0[notes['tick'][i]].remove(5)
+
+        if coded_notes_0[notes['tick'][i]] != list(set(coded_notes_0[notes['tick'][i]])):  # Check for duplicate values
+            if len(coded_notes_0[notes['tick'][i]]) > 2:
+                # print('Duplicate notes present in chart at tick {}'.format(notes['tick'][i]))
+                # print('Old notes: ', coded_notes_0[notes['tick'][i]])
+                coded_notes_0[notes['tick'][i]] = list(set(coded_notes_0[notes['tick'][i]]))
+                # print('New notes: ', coded_notes_0[notes['tick'][i]])
 
     # coded_notes_1 will hold intermediate values of coded_notes
     coded_notes_1 = {}
 
     for x in coded_notes_0.keys():
         if 5 in coded_notes_0[x]:    # If a force note
+            # print('coded_notes_0[x]: ', coded_notes_0[x])
             coded_notes_0[x].remove(5)
+            # print('coded_notes_0[x]: ', coded_notes_0[x])
             coded_notes_1[x] = map_notes_0(coded_notes_0[x], 'force')
         elif 6 in coded_notes_0[x]:  # If a tap note
             coded_notes_0[x].remove(6)
@@ -196,8 +244,14 @@ def chart2onehot(path, print_release_notes=False):
 
     for x in coded_notes_1.keys():
         notestring = ''
+        if sorted(coded_notes_1[x]) != coded_notes_1[x]:
+            # print('Notes are unsorted, sorting now')
+            # print('original: ', coded_notes_1[x])
+            coded_notes_1[x] = sorted(coded_notes_1[x])
+            # print('sorted_notes: ', coded_notes_1[x])
         for note_event in coded_notes_1[x]:
-            notestring += str(note_event)
+            notestring += str(note_event)  
+            # print(notestring)
         coded_notes_2[x] = notestring
 
     combo_dictionary = generate_combo_dict()
@@ -220,6 +274,7 @@ def chart2onehot(path, print_release_notes=False):
                 release_digits = ''
                 code = ''
                 for digit in coded_notes_2[x]:
+                    # print('coded_notes_2[x]: ', coded_notes_2[x])
                     if not code:
                         code = digit
                         continue
@@ -229,7 +284,8 @@ def chart2onehot(path, print_release_notes=False):
                         code = digit
                         continue
                     if code in ['16', '23', '30', '37', '44']:
-                        release_digits += code
+                        if code not in release_digits:
+                            release_digits += code
                     else:
                         replacement_digits += code
 
@@ -240,16 +296,59 @@ def chart2onehot(path, print_release_notes=False):
                 replaced['replacement_digits'].append(replacement_digits)
                 if print_release_notes:            
                     print('Release Notes Coincided at tick', x,': bumped to tick', y)
+                    print('Full replaced dictionary: ', replaced)
                 
 
     for i in range(len(replaced['x'])):
         coded_notes_2[replaced['x'][i]] = replaced['replacement_digits'][i]
         coded_notes_2[replaced['y'][i]] = replaced['release_digits'][i]
         try:
-            coded_notes_3[replaced['x'][i]] = combo_dictionary[coded_notes_2[replaced['x'][i]]]
-            coded_notes_3[replaced['y'][i]] = combo_dictionary[coded_notes_2[replaced['y'][i]]]
+            if replaced['replacement_digits'][i] and replaced['release_digits'][i]:  # If the error was flagged as a new note coinciding with a release
+                coded_notes_3[replaced['x'][i]] = combo_dictionary[coded_notes_2[replaced['x'][i]]]
+                coded_notes_3[replaced['y'][i]] = combo_dictionary[coded_notes_2[replaced['y'][i]]]
+            if replaced['replacement_digits'][i] and not replaced['release_digits'][i]:  # If the error was flagged as a new note coinciding with another new note
+                codes = []
+                code = ''
+                for digit in replaced['replacement_digits'][i]:
+                    # print('replaced[\'replacement_digits\'][i]: ', replaced['replacement_digits'][i])
+                    if not code:
+                        code = digit
+                        continue
+                    if len(code) < 2:
+                        code += digit
+                        codes.append(int(code))
+                    else:
+                        code = digit
+                        continue
+                code = max(codes)
+                # print('max code = ', code)
+                replaced['replacement_digits'][i] = str(code)
+                coded_notes_2[replaced['x'][i]] = replaced['replacement_digits'][i]
+                coded_notes_3[replaced['x'][i]] = combo_dictionary[coded_notes_2[replaced['x'][i]]]
+                # coded_notes_3[replaced['y'][i]] = combo_dictionary[coded_notes_2[replaced['y'][i]]]
         except:
-            raise NameError('Release notes are not in combination dictionary')
+            try:
+                codes = []
+                code = ''
+                for digit in replaced['replacement_digits'][i]:
+                    # print('replaced[\'replacement_digits\'][i]: ', replaced['replacement_digits'][i])
+                    if not code:
+                        code = digit
+                        continue
+                    if len(code) < 2:
+                        code += digit
+                        codes.append(int(code))
+                    else:
+                        code = digit
+                        continue
+                code = max(codes)
+                # print('max code = ', code)
+                replaced['replacement_digits'][i] = str(code)
+                coded_notes_2[replaced['x'][i]] = replaced['replacement_digits'][i]
+                coded_notes_3[replaced['x'][i]] = combo_dictionary[coded_notes_2[replaced['x'][i]]]
+                # coded_notes_3[replaced['y'][i]] = combo_dictionary[coded_notes_2[replaced['y'][i]]]
+            except:
+                raise NameError('Release notes are not in combination dictionary')
     
     return coded_notes_3
 
@@ -265,6 +364,7 @@ def map_notes_0(note_array, note_type):
     '''
     assert note_type in ['regular', 'force', 'tap'], 'note_type should be "regular", "force", or "tap"'
     
+    # Behold, the great elif statement that should have been a dictionary.
     for i in range(len(note_array)):
         if note_array[i] == 0:
             note_array[i] = 10
@@ -298,7 +398,13 @@ def map_notes_0(note_array, note_type):
             note_array[i] = 44
         elif note_array[i] == 7:
             note_array[i] = 45
+        elif note_array[i] == 17:  # Added these last two as a patch - need to check
+            note_array[i] = 48
+        elif note_array[i] == 27:
+            note_array[i] = 51
         else:
+            print(note_array)
+            print('The erroneous note in note_array at index {} is {}'.format(i, note_array[i]))
             raise NameError('Error: note encoded incorrectly')
 
         if note_type == 'regular':
@@ -350,6 +456,10 @@ def generate_combo_dict():
     all_combinations.append('45')
     all_combinations.append('46')
     all_combinations.append('47')
+    all_combinations.append('48')
+    all_combinations.append('49')
+    all_combinations.append('50')
+    all_combinations.append('51')
 
     combo_dictionary = {}
     for i in range(1, len(all_combinations)+1):
