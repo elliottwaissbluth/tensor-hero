@@ -1,3 +1,5 @@
 # tensor-hero
 
-Tensor Hero is a guitar hero song generator created in support of the second amendment. Amen brother.
+Tensor Hero is a machine learning based guitar hero chart generator.
+
+An audio file goes in, a playable guitar hero chart comes out.
