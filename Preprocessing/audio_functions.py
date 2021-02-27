@@ -8,6 +8,8 @@ def music2tensor(path, display_spectrogram = False):
     music2tensor takes a path to an audio file as input and returns a tensor of processed audio data.
     - path = path to audio file
     - display_spectrogram = if true, will print a figure showing the spectrograms
+
+    returns a tensor with dimensions (channels, mel bins, 10ms time slice)
     '''
     # Load the song and get the sample rate, sr
     data, sr = librosa.load(path)
@@ -58,13 +60,7 @@ def music2tensor(path, display_spectrogram = False):
     S46arr = np.nan_to_num(np.divide(np.subtract(S46arr, S46_mean), S46_std))
     S23arr = np.nan_to_num(np.divide(np.subtract(S23arr, S23_mean), S23_std))
 
-    # Split up the arrays into 81 x 15 tensors representing 150ms of audio context
-    S93_split = np.array([S93arr[:, i-7 : i+8] for i in range(7, S93arr.shape[1] - 7)])
-    S46_split = np.array([S46arr[:, i-7 : i+8] for i in range(7, S46arr.shape[1] - 7)])
-    S23_split = np.array([S23arr[:, i-7 : i+8] for i in range(7, S23arr.shape[1] - 7)])
-
-    # Stack matrices along second dimenstion to create full tensor
-    S_tensor = np.stack((S93_split, S46_split, S23_split), axis=1)
+    S_tensor = np.stack((S93arr, S46arr, S23arr), axis=0)
 
     if display_spectrogram:
         fig, ax = plt.subplots(nrows=3, ncols=1, sharex=True, figsize=(10,5))
@@ -80,3 +76,6 @@ def music2tensor(path, display_spectrogram = False):
 
     return S_tensor
 
+def split_music_tensor(S_tensor):
+    S_tensor = np.array([S_tensor[:,:, i-7 : i+8] for i in range(7, S_tensor.shape[2] - 7)])
+    return S_tensor

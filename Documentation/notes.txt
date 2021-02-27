@@ -1,0 +1,4 @@
+Check out that openAI paper and read up on how they did architecture (sec. 2.4 was useful)
+    It may be beneficial to use a similar encoding mechanism to generate audio and note embeddings.
+
+Maybe start to implement that architecture.

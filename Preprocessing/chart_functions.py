@@ -11,6 +11,11 @@ def chart2tensor(path, print_release_notes=False):
     representation as values.
     '''
     coded_notes = chart2onehot(path, print_release_notes)
+
+    if coded_notes == None:
+        print('\nThe chart at {} is not in .chart format'.format(path))
+        return None
+
     notes_tensor = np.zeros(max(coded_notes.keys()))
     for k, v in coded_notes.items():
         notes_tensor[k-1] = v
@@ -29,9 +34,12 @@ def chart2dict(path):
     '''
 
     # Read chart into array
-    with open(path, 'r') as file:
-        raw_chart = file.readlines()
-    file.close()
+    try:
+        with open(path, 'r') as file:
+            raw_chart = file.readlines()
+        file.close()
+    except:  # This will happen when the chart is not in .chart format
+        return None, None, None, None
 
     # Strip lines of \n character
     for i in range(len(raw_chart)):
@@ -186,6 +194,9 @@ def chart2onehot(path, print_release_notes=False):
                             bumped due to coincidence with the start of new notes.
     '''
     notes, _, _, _ = chart2dict(path)
+
+    if notes == None:  # If the chart file is not in .chart format
+        return None
 
     # Create a dictionary where the keys are the tick values and the values
     # are a list of notes corresponding to the data
