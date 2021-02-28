@@ -1,5 +1,3 @@
-Debug:
-    Note and song dimension mismatch.
-    Might have to recalculate notes and songs
+Implement the dataloader. VS CODE bugged OUT AND LOST SOME SAVED .
 
-Implement the dataloader. VS Code bugged out and lost some saved things.
+
