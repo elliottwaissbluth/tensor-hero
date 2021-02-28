@@ -1,4 +1,5 @@
-Check out that openAI paper and read up on how they did architecture (sec. 2.4 was useful)
-    It may be beneficial to use a similar encoding mechanism to generate audio and note embeddings.
+Debug:
+    Note and song dimension mismatch.
+    Might have to recalculate notes and songs
 
-Maybe start to implement that architecture.
+Implement the dataloader. VS Code bugged out and lost some saved things.

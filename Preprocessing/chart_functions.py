@@ -18,7 +18,7 @@ def chart2tensor(path, print_release_notes=False):
 
     notes_tensor = np.zeros(max(coded_notes.keys()))
     for k, v in coded_notes.items():
-        notes_tensor[k-1] = v
+        notes_tensor[k-1] = v       # This could potentially offset all notes by 10ms
     return notes_tensor
 
     
@@ -53,7 +53,7 @@ def chart2dict(path):
     # Parse chart file, populating lists
     i = 0
     for data in raw_chart:
-        if data == '[Song]' or data == 'ï»¿[Song]':
+        if '[Song]' in data:
             i = 1
         elif data == '[SyncTrack]':
             i = 2
@@ -152,6 +152,233 @@ def chart2dict(path):
 
     return notes, song_metadata, time_signatures, BPMs
 
+def shift_ticks(notes, song_metadata, time_signatures, BPMs):
+    '''
+    shift_ticks converts the time signatures to 31.25 BPM w/ TS 4, i.e. the ticks are
+    shifted to correspond to 10ms slots.
+        - Parameters come from chart2dict 
+    '''
+    # Split the song into bins corresponding to particular time signatures and BPMs
+
+    # First, assemble some lists from the preprocessing step
+    note_keys = list(zip(notes['tick'], notes['N_S'], 
+                    notes['note'], notes['duration']))                    # (tick, 'N_S', note)
+    TS_events = list(zip(time_signatures['tick'], time_signatures['TS']))  # (tick, TS)
+    BPM_events = list(zip(BPMs['tick'], BPMs['BPM']))                      # (tick, BPM)
+
+    # Append None at the end of these lists so the loop knows where to stop
+    TS_events.append(None)
+    BPM_events.append(None)
+
+    # Loop through all the notes in the song
+    TS_index = 0
+    BPM_index = 0
+
+    cur_TS = TS_events[TS_index]                # Current time signature
+    cur_BPM = BPM_events[BPM_index]             # Current BPM
+    next_TS = None                              # Next time signature
+    next_BPM = None                             # Next BPM
+    if len(TS_events) > 1:
+        next_TS = TS_events[TS_index + 1]
+    if len(BPM_events) > 1:
+        next_BPM = BPM_events[BPM_index + 1]
+
+
+    # bins['TS'][0] corresponds to the time signature of bin 0
+    # bins['notes'] is a list of lists of notes in each bin
+    bins = {
+        'TS' : [],              # time signature
+        'BPM' : [],             # BPM
+        'shift_tick' : [],      # The first tick where the TS / BPM combo starts
+        'notes' : [[]],         # The notes in the bin
+    }
+
+    # Append the first element of each array before looping
+    event_index = 0     # Counts how many times either BPM or TS change
+    bins['TS'].append(cur_TS[1])
+    bins['BPM'].append(cur_BPM[1])
+    bins['shift_tick'].append(cur_BPM[0])
+    bins['notes'][event_index].append(note_keys[0])
+
+    # Initialize ticks
+    cur_TS_tick = cur_TS[0]
+    if next_TS != None:
+        next_TS_tick = next_TS[0]
+    else:
+        next_TS_tick = None
+    cur_BPM_tick = cur_BPM[0]
+    if next_BPM != None:
+        next_BPM_tick = next_BPM[0]
+    else:
+        next_BPM_tick = None
+
+    for i in range(1, len(note_keys)):
+        if next_BPM_tick == None and next_TS_tick == None:     # If in the last bin
+            bins['notes'][-1].append(note_keys[i])             # Add notes until there are no more to add
+            continue
+        
+        if next_TS_tick != None:                        # If there is a time signature change in the future
+            if note_keys[i][0] >= next_TS_tick:         # If the current note is past that change                            
+                if next_BPM_tick != None:                   # If there is a BPM change in the future
+                    if note_keys[i][0] >= next_BPM_tick:    # If the current note is past that change
+                        TS_index += 1                       # Update time signature and BPM, they changed at the same time
+                        cur_TS = TS_events[TS_index]
+                        cur_TS_tick = cur_TS[0]
+                        next_TS = TS_events[TS_index + 1]
+                        if next_TS != None:
+                            next_TS_tick = next_TS[0]
+                        else:
+                            next_TS_tick = None
+
+                        BPM_index += 1
+                        cur_BPM = BPM_events[BPM_index]
+                        cur_BPM_tick = cur_BPM[0]
+                        next_BPM = BPM_events[BPM_index + 1]
+                        if next_BPM != None:
+                            next_BPM_tick = next_BPM[0]
+                        else:
+                            next_BPM_tick = None
+
+                        bins['TS'].append(cur_TS[1])
+                        bins['BPM'].append(cur_BPM[1])
+                        bins['shift_tick'].append(min(cur_TS[0], cur_BPM[0]))
+                        bins['notes'].append([])
+                        bins['notes'][-1].append(note_keys[i])
+                        continue
+
+                    else:                                   # If the time signature changed but the BPM didn't
+                        TS_index += 1                       # Update the time signature, but not the BPM
+                        cur_TS = TS_events[TS_index]
+                        cur_TS_tick = cur_TS[0]
+                        next_TS = TS_events[TS_index + 1]
+                        if next_TS != None:
+                            next_TS_tick = next_TS[0]
+                        else:
+                            next_TS_tick = None
+
+                        bins['TS'].append(cur_TS[1])
+                        bins['BPM'].append(cur_BPM[1])
+                        bins['shift_tick'].append(min(cur_TS[0], cur_BPM[0]))
+                        bins['notes'].append([])
+                        bins['notes'][-1].append(note_keys[i])
+                        continue
+
+                else:                               # If the next BPM tick = None but the note tick is past the time signature
+                    TS_index += 1                   # Update the time signature, but not the BPM
+                    cur_TS = TS_events[TS_index]
+                    cur_TS_tick = cur_TS[0]
+                    next_TS = TS_events[TS_index + 1]
+                    if next_TS != None:
+                        next_TS_tick = next_TS[0]
+                    else:
+                        next_TS_tick = None       
+
+                    bins['TS'].append(cur_TS[1])
+                    bins['BPM'].append(cur_BPM[1])
+                    bins['shift_tick'].append(cur_TS[0])
+                    bins['notes'].append([])
+                    bins['notes'][-1].append(note_keys[i])
+                    continue
+
+            else:  # If there is a time signature change in the future but the note is not past it
+                if next_BPM_tick != None:                   # If there is a BPM change in the future
+                    if note_keys[i][0] >= next_BPM_tick:    # If the note is past that BPM change    
+                        BPM_index += 1                      # Update the BPM but not the time signature
+                        cur_BPM = BPM_events[BPM_index]
+                        cur_BPM_tick = cur_BPM[0]
+                        next_BPM = BPM_events[BPM_index + 1]
+                        if next_BPM != None:
+                            next_BPM_tick = next_BPM[0]
+                        else:
+                            next_BPM_tick = None
+
+                        bins['TS'].append(cur_TS[1])
+                        bins['BPM'].append(cur_BPM[1])
+                        bins['shift_tick'].append(cur_BPM[0])
+                        bins['notes'].append([])
+                        bins['notes'][-1].append(note_keys[i])
+                        continue
+
+                    else:  # If the time signature did not change and the BPM also did not change
+                        bins['notes'][-1].append(note_keys[i])  # Add note and continue
+                        continue
+
+        #-------------------------------------------------------------------------------------------------------#
+        # The second half of the ifzilla:
+        # If there is not a time signature change in the future
+
+        else:                        # If there is NOT a time signature change in the future                              
+            if next_BPM_tick != None:                   # If there is a BPM change in the future
+                if note_keys[i][0] >= next_BPM_tick:    # If the current note is past that change
+                    BPM_index += 1                      # Update the BPM
+                    cur_BPM = BPM_events[BPM_index]
+                    cur_BPM_tick = cur_BPM[0]
+                    next_BPM = BPM_events[BPM_index + 1]
+                    if next_BPM != None:
+                        next_BPM_tick = next_BPM[0]
+                    else:
+                        next_BPM_tick = None
+
+                    bins['TS'].append(cur_TS[1])
+                    bins['BPM'].append(cur_BPM[1])
+                    bins['shift_tick'].append(cur_BPM[0])
+                    bins['notes'].append([])
+                    bins['notes'][-1].append(note_keys[i])
+                    continue
+
+                else:  # If the current note is not past the BPM change
+                    bins['notes'][-1].append(note_keys[i])  # Add note and continue
+                    continue
+
+            else:                               # If the next BPM tick = None and the next TS tick = None
+                                                # Then the if statement at the beginning of this thing should have fired off
+                raise NameError('Error: Tick Conversion Failure')
+
+    bins['X'] = []                # Tick conversion factor
+    bins['sync_tick'] = []        # The tick value that the first note in 'notes' should have
+    res = song_metadata['Resolution']
+    BPM_new = int(60000 / (res*0.01))
+
+    # Populate 'X' and 'sync_tick' field of bins
+    for i in range(len(bins['shift_tick'])):
+        bins['X'].append(BPM_new / bins['BPM'][i])  # 31250 = 31.25 beats/minute * 1000, this BPM corresponds to 10ms per tick
+
+        if i == 0:
+            bins['sync_tick'].append(0)
+        else:
+            bins['sync_tick'].append(round(bins['notes'][i][0][0] * bins['X'][i-1]))
+
+    # Create array in bins for 'shift'
+    bins['shift'] = [0]  # Don't shift the first bin
+
+    # Convert note ticks to using conversion factor X
+    for i in range(len(bins['shift_tick'])):
+        for j in range(len(bins['notes'][i])):
+            bins['notes'][i][j] = list(bins['notes'][i][j])  # Convert to list
+            
+            # Construct shift length
+            if j == 0 and i != 0:
+                bins['shift'].append(round((bins['shift_tick'][i] * bins['X'][i])) - (round((bins['shift_tick'][i] * bins['X'][i-1])) - bins['shift'][i-1]))
+
+            bins['notes'][i][j][0] = round(bins['notes'][i][j][0]*bins['X'][i])  # Scale tick mark
+            bins['notes'][i][j][3] = round(bins['notes'][i][j][3]*bins['X'][i])  # Scale duration
+            bins['notes'][i][j][0] -= bins['shift'][i]                           # Shift
+
+    # Convert back to dictionary format
+    shifted_notes = {'tick' : [],        # What tick the note is at
+                    'N_S' : [],         # Whether it is a note (N) or star power (S)
+                    'note' : [],        # What the note is 
+                    'duration': []}     # tick duration of the note or star power
+
+    for T_bin in bins['notes']:
+        for n in T_bin:
+            shifted_notes['tick'].append(n[0])
+            shifted_notes['N_S'].append(n[1])
+            shifted_notes['note'].append(n[2])
+            shifted_notes['duration'].append(n[3])
+
+    return shifted_notes
+
 
 def get_configuration(path):
     '''
@@ -193,7 +420,8 @@ def chart2onehot(path, print_release_notes=False):
     - print_release_notes = if true, will output a feed of release notes that had to be
                             bumped due to coincidence with the start of new notes.
     '''
-    notes, _, _, _ = chart2dict(path)
+    notes, song_metadata, time_signatures, BPMs = chart2dict(path)
+    notes = shift_ticks(notes, song_metadata, time_signatures, BPMs)
 
     if notes == None:  # If the chart file is not in .chart format
         return None
@@ -494,13 +722,3 @@ def check_for_release_notes(x, coded_notes_2):
         return False
     else:
         return r_in_x
-
-
-# FOR TESTING
-#____________#
-
-# Test chart2onehot()
-#d = str(Path().resolve().parent)
-#chartpath = d+'\\tensor-hero\Preprocessing\Chart Files\degausser_notes.chart'
-#coded_notes = chart2onehot(chartpath, print_release_notes = True)
-#print(coded_notes)
