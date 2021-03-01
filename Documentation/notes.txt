@@ -1,3 +1,5 @@
-Implement the dataloader. VS CODE bugged OUT AND LOST SOME SAVED .
+While running the CNN, getting a memory error after traversing
+all subroots. Maybe need to change some of
+DistributedFolderDataset functions.
 
 

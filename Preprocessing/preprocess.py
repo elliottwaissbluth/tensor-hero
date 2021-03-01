@@ -10,4 +10,6 @@ processed_data_path = Path(r'X:\Training Data\Processed')
 
 data_info = populate_processed_folder(unprocessed_data_path, processed_data_path, replace_notes = True)
 
+# Can use data_info to generate some useful information. Have not implemented it yet but will do soon.
+
 print(data_info)
