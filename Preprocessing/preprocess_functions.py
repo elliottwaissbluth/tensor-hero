@@ -48,6 +48,10 @@ def match_tensor_lengths(notes_tensor, song):
 
 
 def populate_processed_folder(unprocessed_data_path, processed_data_path, replace_notes = False):
+    '''Takes raw data in unprocessed_data_path, preprocesses using chart2tensor for note arrays, music2tensor for audio
+       replace_notes was a bit of a patch job after I messed up and processed the same notes into every processed folder,
+       you can ignore it.'''
+
     wrong_format_charts = []    # Holds paths to charts not in .chart format
     multiple_audio_songs = []   # Holds paths to charts with multiple audio files
     processed = []              # Holds paths to song folders that were successfully processed
@@ -73,6 +77,7 @@ def populate_processed_folder(unprocessed_data_path, processed_data_path, replac
                 os.remove(processed_notes_path)  # Delete because I accidentally saved the same array hundreds of times lol
 
         # Skip creating the directory if there is more than one audio file
+        # (some songs are divided into guitar.ogg, drums.ogg, etc.)
         if check_multiple_audio_files(fileList):
             multiple_audio_songs.append(unprocessed_song_path)
             print('{}, {} contains multiple audio files, skipping'.format(track_pack_, song_))

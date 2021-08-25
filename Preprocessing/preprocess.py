@@ -5,6 +5,7 @@ import sys
 sys.path.insert(1, str(Path().resolve().parent) + r'\Preprocessing')
 from preprocess_functions import populate_processed_folder
 
+# THESE PATHS ARE LOCAL TO MY MACHINE
 unprocessed_data_path = Path(r'X:\Training Data\Unprocessed')
 processed_data_path = Path(r'X:\Training Data\Processed')
 

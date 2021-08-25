@@ -62,11 +62,11 @@ train_paths, val_paths, test_paths = train_val_test_split(root, data_size, shuff
 
 # Define datasets and loaders
 trains = DistributedFolderDataset(train_paths)
-train_loader = torch.utils.data.DataLoader(trains, **params)
+train_loader = torch.utils.data.DataLoader(trains, drop_last=True, **params)
 vals = DistributedFolderDataset(val_paths)
-val_loader = torch.utils.data.DataLoader(vals, **params)
+val_loader = torch.utils.data.DataLoader(vals, drop_last=True, **params)
 tests = DistributedFolderDataset(test_paths)
-test_loader = torch.utils.data.DataLoader(tests, **params)
+test_loader = torch.utils.data.DataLoader(tests, drop_last=True, **params)
 
 criterion = nn.BCEWithLogitsLoss(pos_weight = torch.Tensor([100])) # Start out with high loss for one epoch, then change afterwards
 criterion = criterion.cuda()
