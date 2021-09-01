@@ -45,6 +45,10 @@ def populate_with_simplified_notes(processed_directory):
     
     # Parse through directory
     for x in tqdm(os.listdir(processed_directory)):
+        # Check to see if the .DS_Store file is mysteriously in the directory, skip if so
+        if str(x)[-9:] == '.DS_Store':
+            print('.DS_Store present in directory, continuing')
+            continue
         for y in os.listdir(processed_directory / x):
             # Check to see if the simplified file already exists, continue if so
             if os.path.isfile(processed_directory / x / y / 'notes_simplified.npy'):
@@ -56,6 +60,13 @@ def populate_with_simplified_notes(processed_directory):
                 print('Error: There is no notes.npy file at {}'.format(str(processed_directory / x / y)))
                 print('Continuing')
                 continue
+            except NotADirectoryError as err:
+                print('ERROR: {}'.format(err))
+                if str(y) == '.DS_Store':
+                    print('DS_Store error, continuing')
+                    continue
+                else:
+                    break
 
             new_notes = remove_release_keys(notes_array)
             new_notes = simplify_notes(new_notes)
@@ -68,5 +79,5 @@ def populate_with_simplified_notes(processed_directory):
 if __name__ == '__main__':
     
     # Swap PROCESSED_DIRECTORY with the path to your local version of ./Training Data/Processed
-    PROCESSED_DIRECTORY = Path(r'X:\Training Data\Processed')
+    PROCESSED_DIRECTORY = Path(r'/Users/ewaissbluth/Documents/GitHub/tensor-hero/Training Data/Training Data/Processed')
     populate_with_simplified_notes(PROCESSED_DIRECTORY)

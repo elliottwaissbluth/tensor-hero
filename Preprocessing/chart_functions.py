@@ -45,7 +45,7 @@ def chart2dict(path):
     for i in range(len(raw_chart)):
         raw_chart[i] = raw_chart[i].replace('\n', '')
 
-    # Create lists to hold sections of of the chart file
+    # Create lists to hold sections of the chart file
     song = []
     synctrack = []
     expertsingle = []
