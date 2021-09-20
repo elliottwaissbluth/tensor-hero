@@ -4,8 +4,8 @@ from pathlib import Path
 import sys
 sys.path.insert(1, str(Path().resolve().parent) + r'\Preprocessing')
 import os
-from chart_functions import chart2tensor, get_configuration, chart2onehot
-from audio_functions import music2tensor
+from chart_functions import *
+from audio_functions import *
 from tqdm import tqdm
 import numpy as np
 
@@ -148,6 +148,69 @@ def populate_processed_folder(unprocessed_data_path, processed_data_path, replac
                 'notes_size' : notes_size}
     
     return data_info
+
+def get_list_of_ogg_files(unprocessed_path):
+    '''
+    Takes the root directory (unprocessed_path) and returns a list of the full file paths
+    to all the .ogg files in that directory, provided there is only one per folder (i.e. it
+    skips folders that have source separated music files). Also returns processed_paths, the "processed"
+    directory analog to each item in ogg_file_paths (just a path to the folder, not the files inside)
+
+    ~~~~ INPUTS ~~~~
+    -   unprocessed_path : path object or string to root unprocessed folder. probably ./Training Data/Unprocessed
+
+    ~~~~ OUTPUTS ~~~~
+    -   ogg_file_paths : list of path objects to all .ogg files in unprocessed_path
+    -   processed_paths : list of path objects to the processed folders corresponding to every item
+                          in ogg_file_paths.  
+    '''
+    ogg_file_paths = []
+    processed_paths = []
+    for track_pack in [unprocessed_path / x for x in os.listdir(unprocessed_path)]:
+        for song_dir in [track_pack / y for y in os.listdir(track_pack)]:
+            if check_multiple_audio_files(os.listdir(song_dir)):
+                continue
+            else:
+                for f in os.listdir(song_dir):
+                    if f.endswith('.ogg'):
+                        ogg_file_paths.append(song_dir / f)
+                        processed_paths.append(Path(str(song_dir).replace('Unprocessed', 'Processed', 1)))
+                        
+    return ogg_file_paths, processed_paths
+
+def populate_processed_folder_with_spectrograms(unprocessed_path, REPLACE=True):
+    '''
+    Takes all the .ogg files in unprocessed_path (besides source separated files), computes their spectrogram,
+    then saves that spectrogram to the processed_path analog. If REPLACE = True, the function will replace
+    spectrogram.npy files with newly computed spectrograms, if not, it does not replace.
+
+    Note that processed_path is determined by taking unprocessed_path and replacing "Unprocessed" with "Processed"
+
+    ~~~~ INPUTS ~~~~
+    -   unprocessed_path : path to root unprocessed folder (probably ./Training Data/Unprocessed)
+    '''
+    ogg_file_paths, processed_paths = get_list_of_ogg_files(unprocessed_path)
+    APPEND_ARR_CREATED = False
+    for i in tqdm(range(len(ogg_file_paths))):
+
+        if not os.path.exists(processed_paths[i]): # if the processed folder doesn't exist
+            continue
+        if not REPLACE:     # if processed folder has already been populated
+            if os.path.exists(processed_paths[i] / 'spectrogram.npy'):
+                continue
+
+        spec = compute_mel_spectrogram(ogg_file_paths[i])  # Get spectrogram
+        
+        # Append 70ms of silence at beginnign and end
+        if not APPEND_ARR_CREATED:  # Only define once
+            append_arr = np.ones((spec.shape[0],7)) * np.min(spec)
+            APPEND_ARR_CREATED = True
+        spec = np.c_[append_arr, spec, append_arr]
+
+        # Save to appropriate processed folder
+        np.save(str(processed_paths[i] / 'spectrogram.npy'), spec)
+
+    return
 
 
 

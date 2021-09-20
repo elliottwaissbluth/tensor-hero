@@ -5,6 +5,8 @@ import numpy as np
 
 def music2tensor(path, display_spectrogram = False):
     '''
+    WARNING: SOMETHING IS WRONG WITH THIS FUNCTION AS OF 9/19/2021
+
     music2tensor takes a path to an audio file as input and returns a tensor of processed audio data.
     - path = path to audio file
     - display_spectrogram = if true, will print a figure showing the spectrograms
@@ -79,3 +81,23 @@ def music2tensor(path, display_spectrogram = False):
 def split_music_tensor(S_tensor):
     S_tensor = np.array([S_tensor[:,:, i-7 : i+8] for i in range(7, S_tensor.shape[2] - 7)])
     return S_tensor
+
+def compute_mel_spectrogram(song_path):
+    '''
+    UPDATED: Computes the log-mel spectrogram of a .ogg file
+
+    ~~~~ INPUTS ~~~~
+    -   song_path : path to .ogg file, either string or path object
+    
+    ~~~~ OUTPUTS ~~~~
+    -   spec : 2D numpy array containing log-mel spectrogram.
+        -   dimensions = [frequency, time], frequency dimension is always 512
+        -   each time slice represents 10 milliseconds
+        -   log-scale, so max(spec) = 0, min(spec) = -80
+        -   70ms of silence appended to beginning and end of spectrogram
+    '''
+    data, sr = librosa.load(str(song_path))
+    resampled = librosa.resample(data, sr, 44100)
+    spec = librosa.feature.melspectrogram(resampled, 44100, n_fft=2048*2, hop_length=441, n_mels=512, power=2, fmax = sr/2)
+    spec = librosa.power_to_db(spec, ref=np.max)
+    return spec
