@@ -17,6 +17,20 @@ class Dataset(torch.utils.data.Dataset):
         # TODO
         return
 
+class InputEmbedding(nn.Module):
+    def __init__(
+        self,
+        src,
+        embedding_size,
+        max_len,
+        dropout,
+    ):
+        super(InputEmbedding, self).__init__()
+
+        # Take the spectrogram frames and pass them through a FC layer
+
+
+
 class Transformer(nn.Module):
     def __init__(
         self,
@@ -50,7 +64,7 @@ class Transformer(nn.Module):
 
     def make_src_mask(self, src):
         # src shape: (src_len, N)
-        src_mask = src.transpose(0, 1) = self.src_pad_idx
+        src_mask = src.transpose(0, 1) == self.src_pad_idx
         # (N, src_len)
         return src_mask
 
