@@ -2,3 +2,4 @@ __pycache__/
 .vscode/
 **/Training Data
 .DS_Store
+**/venv
