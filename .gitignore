@@ -2,5 +2,9 @@ __pycache__/
 .vscode/
 **/Training Data
 .DS_Store
+<<<<<<< HEAD
 **/Prototyping/runs*
 **/Model_1/Preprocessing/keys
+=======
+**/venv
+>>>>>>> samanthas work files
