@@ -1,0 +1,37 @@
+Model 1 uses one hot encodings as output from the decoder. This describes the meaning of that one hot encoding.
+
+There are 435 "words" in our vocabulary.
+    - 32 for note representations
+    - 400 for absolute time events
+    - 2 for <sos> and <eos> (<Start of Sequence>, <End of Sequence>)
+    - 1 for <pad> (not sure we'll use it though)
+
+
+The functions that define this are in /tensor-hero/Model_1/Preprocessing/m1_preprocessing.py
+If you execute that script, you will find plenty of examples in your training data folder.
+
+Here are the indices correlated to what they represent:
+    - 0-31
+        - Notes
+        - 32 possible values, 31 combos of GRYBO and 1 for open note
+    - 32-431
+        - Time slices
+        - idx 32 corresponds to time bin 0-10ms, idx 432 corresponds to time bin 3990-4000ms
+    - 432 
+        - <sos>
+        - The beginning of every sequence
+    - 433 
+        - <eos>
+        - The end of every sequence
+    - 434
+        - <pad>
+        - we're not using this yet but if we do it will be padded after <eos> to a specified length
+
+A sequence will probably look something like this:
+
+[433, 36, 4, 89, 0, 101, 2, 434]
+
+which translates to
+
+[<sos>, t=(36-32)*10 ms, orange note, t=(89-32)*10 ms, green note, t=(101-32)*10 ms, yellow note, <eos>]
+[<sos>, orange note at t=40ms, green note at t=570ms, yellow note at t=690ms, <eos>]
