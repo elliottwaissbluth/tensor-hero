@@ -35,7 +35,9 @@ class Dataset(torch.utils.data.Dataset):
         return 1
     
     def __getitem__(self, idx):
-        return torch.tensor(self.spec, dtype=torch.float), self.notes
+        # one "item" is a full 400ms spectrogram and the notes
+        return torch.tensor(self.spec, dtype=torch.float), self.notes  # Everytime __getitem__ is called, it will return the same thing
+
 
 class InputEmbedding(nn.Module):
     def __init__(
@@ -60,24 +62,33 @@ class InputEmbedding(nn.Module):
 class Transformer(nn.Module):
     def __init__(
         self,
-        embedding_size,
-        trg_vocab_size,
-        src_pad_idx,
-        num_heads,
-        num_encoder_layers,
-        num_decoder_layers,
-        forward_expansion,
-        dropout,
-        max_len, # Note, max len is the same for both the input and the output
-        device,
+        embedding_size,   # 512
+        trg_vocab_size,   # 434
+        num_heads,        # 8
+        num_encoder_layers,  # 3
+        num_decoder_layers,  # 3
+        forward_expansion,   # 2048
+        dropout,             # 0.1
+        max_len,    # 400
+        device,     # GPU or CPU?
     ):
         super(Transformer, self).__init__()
         self.src_position_embedding = nn.Embedding(max_len, embedding_size)
         # self.src_word_embedding = InputEmbedding(embedding_size, dropout)
         self.trg_position_embedding = nn.Embedding(max_len, embedding_size)
         self.trg_word_embedding = nn.Embedding(trg_vocab_size, embedding_size)
-        self.device = device
-        self.transformer = nn.Transformer(
+
+        # The word embeddings need to come from a series of parallel linear layers, as defined in
+        # this module list
+        # inputs of dim 512, so we can't feed nn.Embedding an index
+        self.src_word_embedding = nn.ModuleList(
+            [
+            InputEmbedding(embedding_size) for _ in range(max_len)
+            ]
+        )
+
+        self.device = device    # device will be used to move tensors from CPU to GPU 
+        self.transformer = nn.Transformer(  # Define transformer
             embedding_size,
             num_heads,
             num_encoder_layers,
@@ -109,9 +120,13 @@ class Transformer(nn.Module):
     
     def make_embed_src(self, src):
         out = torch.zeros_like(src).to(self.device)
-        for idx, emb in enumerate(self.src_word_embedding):
-            out[...,idx] = emb(src[...,idx])
-
+        # out is shape [1,512,400], just like the src.
+        # "out" means the embedding of the input
+        # when we loop, we access [1,512,0], [1,512,1], [1,512,2], ... , [1,512,399]
+        # translating 400 slices of spectrogram data to 400 slices of embeddings
+        for idx, emb in enumerate(self.src_word_embedding): # For each spectrogram frame
+            out[...,idx] = emb(src[...,idx])                # Pass through an input embedding layer and take output
+            # out[...,idx] == out[:,:,idx]
         return out
 
 
@@ -125,23 +140,33 @@ class Transformer(nn.Module):
             torch.arange(0, src_seq_length).unsqueeze(1).expand(src_seq_length, N)
             .to(self.device)
             )
+        # [0, 1, 2, 3, ..., 399]
 
-        
+        # trg_positions is the same thing as src_positions, but with a slightly different shape since the trg and src inputs are
+        # formatted in different ways (src is spectrogram frames, trg is a series of indices corresponding to note events)
         trg_positions = (
             torch.arange(0, trg_seq_length).unsqueeze(1).expand(trg_seq_length, N).permute(1,0)
             .to(self.device)
         )
-        # TODO: Make embed src from spectrogram frames
+        # [0, 1, 2, ..., 50] shape = (51) to shape = (N, 51)
+        # if N = 2, AKA 2 spectrograms per batch
+        # trg_positions = [[0, 1, 2, ..., 50], [0, 1, 2, ..., 50]]
+        # trg without padding = [433, 70, 0, 300, 3, 434], Len = 5
+        # trg with padding = [433, 70, 0, 300, 3, 434, 435, 435, 435, 435, ..., 435] Len = max_trg_seq_len
 
         embed_src = self.dropout(
             (self.make_embed_src(src) + self.src_position_embedding(src_positions).permute(1,2,0))
             .to(self.device)
         ).permute(0,2,1)
-
+        # This is going into the transformer (final input after the pink blocks)
+        
+        # embed_trg uses "word" embeddings since trg is just a list of indices corresponding to "words" i.e. note events.
+        # Positional embeddings are summed at this stage.
         embed_trg = self.dropout(
             (self.trg_word_embedding(trg) + self.trg_position_embedding(trg_positions))
             .to(self.device)
         )
+        # This is going into the decoder
 
         trg_mask = self.transformer.generate_square_subsequent_mask(trg_seq_length).to(self.device)
 
@@ -149,7 +174,7 @@ class Transformer(nn.Module):
             embed_src,
             embed_trg,
             src_key_padding_mask = src_padding_mask,
-            tgt_mask=trg_mask
+            tgt_mask=trg_mask,
         )
 
         out = self.fc_out(out)
