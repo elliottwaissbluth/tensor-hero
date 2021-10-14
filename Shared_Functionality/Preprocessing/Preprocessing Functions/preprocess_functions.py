@@ -9,9 +9,6 @@ from audio_functions import *
 from tqdm import tqdm
 import numpy as np
 
-unprocessed_data_path = Path(r'X:\Training Data\Unprocessed')
-processed_data_path = Path(r'X:\Training Data\Processed')
-
 def check_multiple_audio_files(fileList):
     '''Checks if there are separate audio files for single song'''
 

@@ -7,3 +7,4 @@ __pycache__/
 test_key.pkl
 train_key.pkl
 val_key.pkl
+**/runs
