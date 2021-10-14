@@ -5,6 +5,7 @@ import numpy as np
 from pathlib import Path
 import os
 
+
 class Dataset(torch.utils.data.Dataset):
     '''
     '''
@@ -109,7 +110,7 @@ class LazyDataset(torch.utils.data.Dataset):
         self.count += 1
         print('batch ready!')
         return torch.tensor(self.data[:,idx], dtype=torch.float)
-
+      
 class VAE(nn.Module):
     def __init__(
         self,
