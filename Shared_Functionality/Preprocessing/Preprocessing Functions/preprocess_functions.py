@@ -167,7 +167,12 @@ def get_list_of_ogg_files(unprocessed_path):
     ogg_file_paths = []
     processed_paths = []
     for track_pack in [unprocessed_path / x for x in os.listdir(unprocessed_path)]:
+        # Ignore DS_Store if running on mac
+        if 'DS_Store' in str(track_pack):
+            continue
         for song_dir in [track_pack / y for y in os.listdir(track_pack)]:
+            if 'DS_Store' in str(song_dir):
+                continue
             if check_multiple_audio_files(os.listdir(song_dir)):
                 continue
             else:
@@ -213,4 +218,6 @@ def populate_processed_folder_with_spectrograms(unprocessed_path, REPLACE=True):
     return
 
 
-
+if __name__ == '__main__':
+    unprocessed_path = Path(r'/Users/ewaissbluth/Documents/GitHub/tensor-hero/Training Data/Training Data/Unprocessed')
+    populate_processed_folder_with_spectrograms(unprocessed_path)
