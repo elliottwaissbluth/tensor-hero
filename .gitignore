@@ -8,3 +8,5 @@ test_key.pkl
 train_key.pkl
 val_key.pkl
 **/runs
+onsets.pkl
+songs.pkl
