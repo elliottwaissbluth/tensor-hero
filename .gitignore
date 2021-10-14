@@ -4,3 +4,6 @@ __pycache__/
 .DS_Store
 **/Prototyping/runs*
 **/Model_1/Preprocessing/keys
+test_key.pkl
+train_key.pkl
+val_key.pkl

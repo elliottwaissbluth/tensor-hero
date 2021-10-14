@@ -3,6 +3,7 @@ from torch import nn
 import torch.optim as optim
 import numpy as np
 from pathlib import Path
+import os
 
 class Dataset(torch.utils.data.Dataset):
     '''
@@ -23,8 +24,59 @@ class Dataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         return torch.tensor(self.spec_slices[:,idx], dtype=torch.float)
 
+class LazierDataset(torch.utils.data.Dataset):
+    '''
+    Inspects the data at partition_path, creates a list (data_paths) and a dictionary (labels)
+        - data_paths : list
+            [<path to spectrogram frame> for _  in partition_path]
+        - labels : dictionary
+            - [<path to spectrogram frame> : <path to corresponding notes>]
+    Loads each training example one at a time, as called by the dataloader
+
+    ~~~~ ARGUMENTS ~~~~
+    - partition_path : path or str
+        - should be .../Training Data/Model 1 Training/<train, test, or val>
+    - max_len : int
+        - for padding, what the length of the notes arrays should be
+    - pad_idx : int
+        - value the notes tensors will be padded with
+    '''
+    def __init__(self, partition_path, max_len, pad_idx):
+        # Construct list of spectrogram paths
+        self.data_paths = [partition_path / 'spectrograms' / x for x in os.listdir(partition_path / 'spectrograms')]
+        
+        # Construct dictionary
+        self.labels = {}
+        for data_path in self.data_paths:
+            self.labels[data_path] = data_path.parent.parent / 'notes' / (data_path.stem + '.npy')
+
+        self.max_len = max_len
+        self.pad_idx = pad_idx
+
+    def __len__(self):
+        return len(self.data_paths)
+
+    def get_data_dict(self):
+        return self.labels
+
+    def pad_notes(self, notes):
+        '''pads notes with pad_idx to length max_len'''
+        notes = np.pad(notes, 
+                       (0, self.max_len-notes.shape[0]),
+                       'constant',
+                       constant_values=self.pad_idx)
+        return notes
+
+    def __getitem__(self, idx):
+        spec = np.load(self.data_paths[idx])
+        notes = np.load(self.labels[self.data_paths[idx]])
+        notes = self.pad_notes(notes)
+
+        return torch.tensor(spec, dtype=torch.float), torch.tensor(notes)
+
 class LazyDataset(torch.utils.data.Dataset):
     '''
+    first attempt - failed
     '''
     def __init__(self, buckets):
         self.buckets = buckets

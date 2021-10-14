@@ -1,8 +1,8 @@
 from pathlib import Path 
 import sys
 # NOTE: You will have to change this to run it on your local machine
-sys.path.insert(1, r'C:\Users\ewais\Documents\GitHub\tensor-hero\Shared_Functionality\Data_Viz')    # NEEDSCHANGE
-sys.path.insert(1, r'C:\Users\ewais\Documents\GitHub\tensor-hero\Shared_Functionality\Preprocessing\Preprocessing Functions')   # NEEDSCHANGE
+sys.path.insert(1, r'/Users/ewaissbluth/Documents/GitHub/tensor-hero/Shared_Functionality/Data_Viz')    # NEEDSCHANGE
+sys.path.insert(1, r'/Users/ewaissbluth/Documents/GitHub/tensor-hero/Shared_Functionality/Preprocessing/Preprocessing Functions')   # NEEDSCHANGE
 import numpy as np
 from data_viz_functions import *
 from preprocess_functions import *
@@ -165,10 +165,16 @@ def populate_model_1_training_data(training_data_path, model_1_training_path, RE
     val_count = 0
     test_count = 0
 
+    # Create the directory if it doesn't exist
+    if not os.path.isdir(model_1_training_path):
+        os.mkdir(model_1_training_path)
+
     # These paths are used to save the data once it is processed
     train_path = model_1_training_path / 'train'
     if not os.path.isdir(train_path):
         os.mkdir(train_path)
+        os.mkdir(train_path / 'spectrograms')
+        os.mkdir(train_path / 'notes')
     else:
         print('Deleting current files...')
         if REPLACE:
@@ -179,6 +185,8 @@ def populate_model_1_training_data(training_data_path, model_1_training_path, RE
     val_path = model_1_training_path / 'val'
     if not os.path.isdir(val_path):
         os.mkdir(val_path)
+        os.mkdir(val_path / 'spectrograms')
+        os.mkdir(val_path / 'notes')
     else:
         if REPLACE:
             for f in os.listdir(val_path / 'spectrograms'):
@@ -188,6 +196,8 @@ def populate_model_1_training_data(training_data_path, model_1_training_path, RE
     test_path = model_1_training_path / 'test'
     if not os.path.isdir(test_path):
         os.mkdir(test_path)
+        os.mkdir(test_path / 'spectrograms')
+        os.mkdir(test_path / 'notes')
     else:
         if REPLACE:
             for f in os.listdir(test_path / 'spectrograms'):
@@ -288,7 +298,20 @@ def populate_model_1_training_data(training_data_path, model_1_training_path, RE
     f.close()
     return
 
-if __name__ == '__main__':
-    training_data_path = Path(r'X:\Training Data') # NEEDSCHANGE
+def preprocess(training_data_path):
+    '''
+    Run this function to preprocess the entire training data. Creates a folder in the main training data directory
+    called "Model 1 Training" and populates with processed data.
+
+    ~~~~ ARGUMENTS ~~~~
+    - training_data_path - path or string
+        - Path to main training data directory, .../Training Data
+    '''
     model_1_training_path = training_data_path / 'Model 1 Training'
     populate_model_1_training_data(training_data_path, model_1_training_path, REPLACE=True)
+    return
+
+if __name__ == '__main__':
+    training_data_path = Path.cwd() / 'Training Data' / 'Training Data' # NEEDSCHANGE
+    # print(training_data_path)
+    preprocess(training_data_path)
