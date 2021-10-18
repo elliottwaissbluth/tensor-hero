@@ -1,7 +1,7 @@
 ''' samantha's helper functions'''
+import numpy as np
 
-def simplify_ohc_notes(path):
-   notes_array = np.load(path)
+def simplify_ohc_notes(notes_array):
    notes_array = notes_array.astype(int)
    for i in range(0,len(notes)):
     if notes[i] in [31.62,93,124,155,186,217]:
