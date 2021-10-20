@@ -1,0 +1,4 @@
+Next Steps
+
+- Run through the neural network recipe
+    - especially: feed the network entirely random data and see what happens

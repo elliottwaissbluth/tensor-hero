@@ -22,7 +22,7 @@ class LazierDataset(torch.utils.data.Dataset):
     - pad_idx : int
         - value the notes tensors will be padded with
     '''
-    def __init__(self, partition_path, max_trg_len, pad_idx):
+    def __init__(self, partition_path, max_src_len, max_trg_len, pad_idx):
         # Construct list of spectrogram paths
         self.data_paths = [partition_path / 'spectrograms' / x for x in os.listdir(partition_path / 'spectrograms')]
         
@@ -32,6 +32,7 @@ class LazierDataset(torch.utils.data.Dataset):
             self.labels[data_path] = data_path.parent.parent / 'notes' / (data_path.stem + '.npy')
 
         self.max_trg_len = max_trg_len
+        self.max_src_len = max_src_len
         self.pad_idx = pad_idx
 
     def __len__(self):
@@ -41,21 +42,46 @@ class LazierDataset(torch.utils.data.Dataset):
         return self.labels
 
     def pad_notes(self, notes):
-        '''pads notes with pad_idx to length max_len'''
-        print(notes.shape[0])
+        '''pads notes with pad_idx to length max_trg_len'''
         notes = np.pad(notes, 
-                       (0, self.max_trg_len-notes.shape[0]+1),
+                       (0, self.max_trg_len-notes.shape[0]),
                        'constant',
                        constant_values=self.pad_idx)
         return notes
+    
+    def pad_spec(self, spec):
+        '''pads spec with zeros to length max_src_len'''
+        spec = np.pad(spec,
+                      ((0, 0), (0, self.max_src_len-spec.shape[1])),
+                      'constant',
+                      constant_values=0)
+        return spec
 
     def __getitem__(self, idx):
         spec = np.load(self.data_paths[idx])
+        spec = self.pad_spec(spec)
         notes = np.load(self.labels[self.data_paths[idx]])
         assert notes.shape[0] < self.max_trg_len, 'ERROR: notes array is longer than max_len'
         notes = self.pad_notes(notes)
 
         return torch.tensor(spec, dtype=torch.float), torch.tensor(notes)
+
+class RandomInputDataset(LazierDataset):
+    '''
+    Loads random spectrograms as input but actual notes
+    '''
+    def __init__(self, partition_path, max_src_len, max_trg_len, pad_idx):
+        super().__init__(partition_path, max_src_len, max_trg_len, pad_idx)
+        spec = np.load(self.data_paths[0])
+        self.spec = self.pad_spec(spec)
+        self.shape = [spec.shape[0], spec.shape[1]]
+    def __getitem__(self,idx):
+        random_spec = torch.rand(self.spec.shape[0], self.spec.shape[1])
+        notes = np.load(self.labesl[self.data_paths[idx]])
+        assert notes.shape[0] < self.max_trg_len, 'ERROR: notes array is longer than max_len'
+        notes = self.pad_notes(notes)
+
+        return random_spec, torch.tensor(notes)
 
 class InputEmbedding(nn.Module):
     '''
@@ -140,7 +166,12 @@ class Transformer(nn.Module):
         '''
         # Create tensor of all "False" values for single input
         src_mask = torch.zeros(src.shape[0], 400, dtype=torch.bool)
-        # shape = (N, src_len), 
+        # Create a tensor of all "True" values
+        src_mask_true = torch.ones(src.shape[0], src.shape[2]-400, dtype=torch.bool)
+        # Concatenate
+        src_mask = torch.cat((src_mask, src_mask_true), 1)
+        # shape = (N, src_len)
+
         return src_mask
     
     def make_embed_src(self, src):
@@ -156,8 +187,8 @@ class Transformer(nn.Module):
         # when we loop, we access [1,512,0], [1,512,1], [1,512,2], ... , [1,512,399]
         # translating 400 slices of spectrogram data to 400 slices of embeddings
         for idx, emb in enumerate(self.src_word_embedding): # For each spectrogram frame
-            out[...,idx] = emb(src[...,idx])                # Pass through an input embedding layer and take output
-            # out[...,idx] == out[:,:,idx]
+            if idx < 400:
+                out[...,idx] = emb(src[...,idx])   # Pass through an input embedding layer and take output
 
         return out
 
@@ -166,10 +197,6 @@ class Transformer(nn.Module):
         src_seq_length, N = src.shape[2], src.shape[0]  # This is always (400, 1) for now
         trg_seq_length, N = trg.shape[1], trg.shape[0]  # The target sequence length is 51 for our toy training example
                                                         # Originally 52, but we shift the target to mask the last value
-
-        print(f'src_seq_len : {src_seq_length}')
-        print(f'trg_seq_len : {trg_seq_length}')
-        print(f'N : {N}')
 
         src_padding_mask = self.make_src_mask(src).to(self.device)
         

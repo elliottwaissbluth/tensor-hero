@@ -18,7 +18,7 @@ Each song was split into segments of 4 seconds. The last segment was discarded a
     - found as <idx>.npy in ./Training Data/Model 1 Training/<train, test, or val>/spectrograms
     - shape = (512, 400)
         - (frequency bins, time)
-    - normalized in [0,1]\
+    - normalized in [0,1]
     - 70ms silence padding removed from beginning and end
 - processed notes
     - found as <idx>.npy in ./Training Data/Model 1 Training/<train, test, or val>/notes
