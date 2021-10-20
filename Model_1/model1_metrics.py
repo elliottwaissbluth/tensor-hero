@@ -34,6 +34,15 @@ def freq_histogram(truth, output):
     plt.show();
 
 
+def freq_table(truth, output):
+    true = np.histogram(truth, bins = np.arange(0,34))
+    observed = np.histogram(output, bins = np.arange(0,34))
+    data = np.array((true[0], true[0]/np.sum(true[0]), observed[0], observed[0]/np.sum(true[0])))
+    df = pd.DataFrame(data = data.T, columns= ['Truth', '% of total','Observed','% of total'])
+
+    return df
+
+
 #returns plotted histogram of distribution of note GROUP types (ex: single note, double note)
 #requires notes array be of value 0-32
 def type_freq_hit(truth, output):
@@ -42,7 +51,7 @@ def type_freq_hit(truth, output):
     # Position of bars on x-axis
     ind = np.array([0,1,2,3,4,5,6])
 
-    ticks = ['None', 'Single', 'Double', 'Triple', 'Four', 'Five', 'Open']
+    ticks = ['None', 'Single', 'Double', 'Triple', 'Quad', 'Five', 'Open']
     # Figure size
     plt.figure(figsize=(10,5))
 
@@ -55,3 +64,13 @@ def type_freq_hit(truth, output):
     plt.legend()
     plt.xticks(ind,ticks)
     plt.show();
+
+
+def freq_type_table(truth, output):
+    true = np.histogram(truth, bins = [0,1,6,16,26,31,31,33])
+    observed = np.histogram(observed, bins = [0,1,6,16,26,31,31,33])
+    data = np.array((true[0], true[0]/np.sum(true[0]), observed[0], observed[0]/np.sum(true[0])))
+    # Position of bars on x-axis
+    df = pd.DataFrame(data = data.T, columns = ['Truth', '% of total','Observed','% of total'], index= ['None', 'Single', 'Double', 'Triple', 'Quadruple', 'Five', 'Open'])
+
+    return df
