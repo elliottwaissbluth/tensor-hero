@@ -77,7 +77,7 @@ class RandomInputDataset(LazierDataset):
         self.shape = [spec.shape[0], spec.shape[1]]
     def __getitem__(self,idx):
         random_spec = torch.rand(self.spec.shape[0], self.spec.shape[1])
-        notes = np.load(self.labesl[self.data_paths[idx]])
+        notes = np.load(self.labels[self.data_paths[idx]])
         assert notes.shape[0] < self.max_trg_len, 'ERROR: notes array is longer than max_len'
         notes = self.pad_notes(notes)
 

@@ -8,4 +8,3 @@ This folder is useful because it contains a working version of Model 1, which is
 - preprocess_toy_data.ipynb
     - Used to create the files in toy_training_data
     - Some of the functionality is productionized in /Model_1/Preprocessing/m1_preprocessing.py 
-

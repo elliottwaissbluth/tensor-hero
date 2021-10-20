@@ -1,3 +1,11 @@
+# WARNING
+# Some things in the functions are hardcoded. This is a rough outline so be wary of using these functions
+
+# General heuristic for use:
+    # 1) Train model
+    # 2) Define model with same parameters in __main__
+    # 3) Change some of the filepaths related to saving song output
+    # 4) Run the file
 
 import sys
 sys.path.insert(1, r'C:\Users\ewais\Documents\GitHub\tensor-hero\Model_1')
@@ -12,6 +20,7 @@ import shutil
 from librosa.display import specshow
 
 # Convert notes array to strings representing note events
+# This is useful for writing .chart files from notes arrays
 notes_to_chart_strings = {
     1 : ['0'],
     2 : ['1'],
@@ -166,6 +175,18 @@ def predict(model, device, input, sos_idx, max_len):
     return prediction
 
 def write_song_from_notes_array(song_metadata, notes_array, outfolder):
+    '''
+    Takes song_metadata as well as notes_array and writes notes.chart file to outfolder
+
+    ~~~~ ARGUMENTS ~~~~
+    - song_metadata : dict
+        - populates [Song] portion of .chart file
+    - notes_array : numpy array
+        - array of notes with each element corresponding to a 10ms time bin
+    - outfolder : Path
+        - folder to save the chart to
+        - should already exis
+    '''
     f = open(str(outfolder / 'notes.chart'), 'w')
 
     # populate '[Song]' portion of file
@@ -193,7 +214,34 @@ def write_song_from_notes_array(song_metadata, notes_array, outfolder):
     f.close()
         
 
-def full_song_prediction(song_path, model, device, sos_idx, max_len, song_metadata, outfolder,):
+def full_song_prediction(song_path, model, device, sos_idx, max_len, song_metadata, outfolder):
+    '''
+    Reads the song at song_path, uses model to predict notes over time, saves .chart to outfolder
+    and copies song there as well. This outfolder can then be dropped into Clone Hero's song dir.
+    
+    NOTE:
+        - This function is in rough shape right now, needs refined
+        - Model does not predict song in batches, but rather one at a time
+            - Should change this eventually
+    
+    ~~~~ ARGUMENTS ~~~~
+    - song_path : Path
+        - Path to .ogg file
+    - model : PyTorch Model
+        - Model used to predict notes
+        - Currently expected to be Transformer
+    - device : str
+        - cuda or cpu
+    - sos_idx : int
+        - start of sequence index
+        - 432 for simplified notes
+    - max_len : int
+        - max output sequence length
+    - song_metadata : dict
+        - populates [Song] portion of chart file
+    - outfolder : Path
+        - folder to save song and .chart file to
+    '''
     # First, get the song split up into spectrograms 4 second segments
     full_spec = m1_song_preprocessing(song_path)
     # for i in range(full_spec.shape[0]):
@@ -247,6 +295,7 @@ if __name__ == '__main__':
         device,
     ).to(device)
 
+    # just some dummy data for now
     song_metadata = {'Name' : 'test song 2',
                  'Artist' : 'some artist',
                  'Charter' : 'tensorhero',

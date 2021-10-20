@@ -1,4 +1,5 @@
 This folder contains resources related to transforming the training data into a format usable for training model 1
+Also contains postprocessing pipeline for model 1
 
 tldr: run m1_preprocessing.py to preprocess your data, you need to change a few lines and create a directory to get it to work with your computer
 
@@ -11,6 +12,10 @@ tldr: run m1_preprocessing.py to preprocess your data, you need to change a few 
     - There are a few things you need to change in this file to run it on your local machine, everything that needs
     changed is tagged with a comment: NEEDSCHANGE
         - ctl+f search this to find the things you need to modify
+- m1_postprocessing.py
+    - Defines inference for model
+    - Post processing pipeline for model output to .chart file
+    - Includes functionality to go all the way from song to .chart file
 
 ~~~~ Data Format ~~~~
 Each song was split into segments of 4 seconds. The last segment was discarded as it usually didn't add up to 4 seconds
