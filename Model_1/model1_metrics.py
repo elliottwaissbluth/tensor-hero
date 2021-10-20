@@ -45,7 +45,7 @@ def freq_table(truth, output):
 
 #returns plotted histogram of distribution of note GROUP types (ex: single note, double note)
 #requires notes array be of value 0-32
-def type_freq_hit(truth, output):
+def type_freq_hist(truth, output):
     true = np.histogram(truth, bins = np.arange(0,34))
     observed = np.histogram(output, bins = np.arange(0,34))
     # Position of bars on x-axis
