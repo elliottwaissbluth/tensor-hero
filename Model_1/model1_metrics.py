@@ -10,9 +10,21 @@ def freq_saturation(truth,output):
     return output_nonzero/truth_nonzero
 
 
-#returns plotted histogram of distribution of note types
-#requires notes array be of value 0-32
+
 def freq_histogram(truth, output):
+    """
+    #returns plotted histogram of distribution of note types
+    #requires notes array be of value 0-32
+
+    ~~~~ ARGUMENTS ~~~~
+    - truth : <datatype>
+        - description
+    - output : <datatype>
+        - description
+    
+    ~~~~ RETURNS ~~~~
+    - ??? : <datatype>
+    """
     true = np.histogram(truth, bins = np.arange(0,34))
     observed = np.histogram(output, bins = np.arange(0,34))
     # Position of bars on x-axis
