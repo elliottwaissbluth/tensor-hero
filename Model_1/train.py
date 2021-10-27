@@ -6,20 +6,32 @@ import os
 import json
 import pickle
 
+def load_model(model_directory):
+    '''
+    loads model and param dict from model_directory. useful for continuing training
+    '''
+    with open(str(model_directory / 'params.pkl'), 'rb') as f:
+        params = pickle.load(f)
+    f.close()
+
+    return params
+
+
 if __name__ == '__main__':
     # NOTE: Without if __name__ == '__main__', multithreading makes this script impossible to run
     
     # control the parameters of the run here
     params = {
-        'training_data' : 'random',     # CHANGEME (these parameters must be changed each experiment)
-        'model_name' : 'model7',        # CHANGEME
+        'training_data' : 'train',     # CHANGEME (these parameters must be changed each experiment)
+        'model_name' : 'model9',        # CHANGEME
         'optimizer' : 'Adam',           # CHANGEME (maybe not this one, but you do have to fill it in manually)
 
-        'num_epochs' : 1,
-        'batch_size' : 16,
+        'num_epochs' : 20,
+        'batch_size' : 8,
         'shuffle' : True,
         'num_workers' : 4,
         'drop_last' : True,
+        'last_global_step' : 0,
 
         'max_trg_len' : 500,
         'max_src_len' : 500,
@@ -29,10 +41,10 @@ if __name__ == '__main__':
 
         'lr' : 3e-4,
         'num_heads' : 8,
-        'num_encoder_layers' : 2,
-        'num_decoder_layers' : 2,
+        'num_encoder_layers' : 4,
+        'num_decoder_layers' : 4,
         'dropout' : 0.1,
-        'forward_expansion' : 4,
+        'forward_expansion' : 2,
 
         'date' : datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
     }
@@ -45,25 +57,41 @@ if __name__ == '__main__':
     # create folder for model, this code prevents unwanted overwrites
     # This whole override thing is useful when you try to run an experiment but run into a bug
     # and have to restart the program
+    LOAD = False
+    response = str(input('Load from pretrained model? (y/n): ')).lower()
+    while response not in ['y', 'n']:
+        print('invalid input')
+        response = str(input('Are the parameters correct (y/n)?: ')).lower()
+    if response == 'y':
+        LOAD = True
+        response = str(input('Enter name of model to load: '))
+        while not os.path.isdir(Path.cwd() / 'Model_1' / 'saved models' / response):
+            print('Error: {} is not a valid directory'.format(response))
+            response = str(input('Enter name of model to load: '))
+        model_directory = Path.cwd() / 'Model_1' / 'saved models' / response
 
-    # override is True if the director already exists
-    override = os.path.isdir(Path.cwd() / 'Model_1' / 'saved models' / params['model_name'])
-    if override:
-        new_name = input('Directory already exists.\nEnter new model name or override with \'o\': ')
-        if new_name == 'o':
-            override = True
-            # Use the description from last time
-            with open(str(Path.cwd() / 'Model_1' / 'saved models' / params['model_name'] / 'params.pkl'), 'rb') as f:
-                old_params = pickle.load(f)
-            f.close()
-            if 'experiment_description' in old_params.keys():
-                params['experiment_description'] = old_params['experiment_description']
-        else:
-            params['model_name'] = str(new_name)
+    if not LOAD:
+        # override is True if the director already exists
+        override = os.path.isdir(Path.cwd() / 'Model_1' / 'saved models' / params['model_name'])
+        if override:
+            new_name = input('Directory already exists.\nEnter new model name or override with \'o\': ')
+            if new_name == 'o':
+                override = True
+                # Use the description from last time
+                with open(str(Path.cwd() / 'Model_1' / 'saved models' / params['model_name'] / 'params.pkl'), 'rb') as f:
+                    old_params = pickle.load(f)
+                f.close()
+                if 'experiment_description' in old_params.keys():
+                    params['experiment_description'] = old_params['experiment_description']
+            else:
+                params['model_name'] = str(new_name)
 
-    # make directory for model and create model_file name
-    if not override:
-        os.mkdir(Path.cwd() / 'Model_1' / 'saved models' / params['model_name'])
+        # make directory for model and create model_file name
+        if not override:
+            os.mkdir(Path.cwd() / 'Model_1' / 'saved models' / params['model_name'])
+
+    else:
+        params = load_model(model_directory)
 
     params['model_file_name'] = params['model_name'] + '.pt'
     model_outfile = Path.cwd() / 'Model_1' / 'saved models' / params['model_name'] / params['model_file_name']
@@ -115,7 +143,7 @@ if __name__ == '__main__':
     # Define data loaders
     train_path = Path(r'X:\Training Data\Model 1 Training\train')
     # train_data = LazierDataset(train_path, max_src_len, max_trg_len, pad_idx)
-    train_data = RandomInputDataset(train_path, max_src_len, max_trg_len, pad_idx)
+    train_data = LazierDataset(train_path, max_src_len, max_trg_len, pad_idx)
     train_loader = torch.utils.data.DataLoader(train_data, **dl_params)
     # val_path = Path(r'X:\Training Data\Model 1 Training\val')
     # val_data = LazierDataset(val_path, max_src_len, max_trg_len, pad_idx)
@@ -137,7 +165,7 @@ if __name__ == '__main__':
     max_len = max_src_len
     forward_expansion = params['embedding_size']*params['forward_expansion']
 
-    step = 0  # how many times the model has gone through some input
+    step = params['last_global_step']  # how many times the model has gone through some input
 
     # Define model
     model = Transformer(
@@ -151,6 +179,10 @@ if __name__ == '__main__':
         max_len,
         device,
     ).to(device)
+
+    if LOAD:
+        state_dict_path = str(Path.cwd() / 'Model_1'/ 'saved models' / params['model_name'] / ((params['model_name']) + '.pt'))
+        model.load_state_dict(torch.load(state_dict_path))
 
     # torch.save(model.state_dict(), 'model.pt')
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
@@ -178,10 +210,6 @@ if __name__ == '__main__':
             if batch_idx%25 == 0:
                 print('\nEpoch {}, Batch {}'.format(epoch+1,batch_idx))
                 print('Training Loss: {}'.format(loss.item()))
-                # Visualize gradients
-                for tag, param in model.named_parameters():
-                    if param.requires_grad:
-                        writer.add_histogram(tag, param.grad.data.cpu().numpy(), global_step=step)
             
             loss.backward()                     # Compute loss for every node in the computation graph
 
@@ -189,10 +217,10 @@ if __name__ == '__main__':
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1)
 
             optimizer.step()    # Update model parameters
-            step += 1
+            params['last_global_step'] += 1
 
             # Write to tensorboard
-            writer.add_scalar("Training Loss", loss, global_step=step)
+            writer.add_scalar("Training Loss", loss, global_step=params['last_global_step'])
 
             
             
@@ -204,6 +232,9 @@ if __name__ == '__main__':
         print(f'\nEpoch {epoch+1}/{num_epochs}')
         print(f'Training Loss: {loss.item()}')
         torch.save(model.state_dict(), str(model_outfile))
+        with open(str(Path.cwd() / 'Model_1'/ 'saved models' / params['model_name'] / 'params.pkl'), 'wb') as f:
+            pickle.dump(params, f)
+        f.close()
         print('model saved')
         # # Evaluate on validation set
         # model.eval()
