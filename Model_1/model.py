@@ -135,11 +135,7 @@ class Transformer(nn.Module):
         # this module list
 
         # inputs of dim 512, so we can't feed nn.Embedding an index
-        self.src_word_embedding = nn.ModuleList(
-            [
-            InputEmbedding(embedding_size) for _ in range(max_len)
-            ]
-        )
+        self.src_word_embedding = InputEmbedding(embedding_size)
 
         self.device = device    # device will be used to move tensors from CPU to GPU 
         self.transformer = nn.Transformer(  # Define transformer
@@ -180,17 +176,20 @@ class Transformer(nn.Module):
         so one layer at a time in a for loop. It may be possible to increase the speed of this and parallelize
         by doing a lil trick with nn.Conv1D. We'll investigate this in the future.
         '''
-        out = torch.zeros_like(src).to(self.device)
+        # out = torch.zeros_like(src, requires_grad=True).to(self.device)
+        out_list = []
 
         # out is shape [1,512,400], just like the src.
         # "out" means the embedding of the input
         # when we loop, we access [1,512,0], [1,512,1], [1,512,2], ... , [1,512,399]
         # translating 400 slices of spectrogram data to 400 slices of embeddings
-        for idx, emb in enumerate(self.src_word_embedding): # For each spectrogram frame
+        for idx in range(src.shape[2]): # For each spectrogram frame
             if idx < 400:
-                out[...,idx] = emb(src[...,idx])   # Pass through an input embedding layer and take output
-
-        return out
+                out_list.append(self.src_word_embedding(src[...,idx]).unsqueeze(-1))
+            else:
+                out_list.append(torch.zeros_like(out_list[0]))
+        return out_list
+        
 
 
     def forward(self, src, trg):
@@ -221,15 +220,16 @@ class Transformer(nn.Module):
         # trg without padding = [433, 70, 0, 300, 3, 434], Len = 5
         # trg with padding = [433, 70, 0, 300, 3, 434, 435, 435, 435, 435, ..., 435] Len = max_trg_seq_len
 
-
         # The permutations are just to get the embeddings into the right shape for the encoder
         # Notice how make_embed_src() is called, this is our custom function that passes the input through the parallel dense layers
+        out_list = self.make_embed_src(src)
+        src_embed = torch.cat(out_list, dim=2)
+
         embed_src = self.dropout(
-            (self.make_embed_src(src) + self.src_position_embedding(src_positions).permute(1,2,0))
+            (src_embed + self.src_position_embedding(src_positions).permute(1,2,0))
             .to(self.device)
         ).permute(0,2,1)
         # This is going into the transformer (final input after the pink blocks)
-
         
         # embed_trg uses "word" embeddings since trg is just a list of indices corresponding to "words" i.e. note events.
         # Positional embeddings are summed at this stage.

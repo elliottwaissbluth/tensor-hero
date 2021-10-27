@@ -1,0 +1,8 @@
+model8
+    - Learns but not better than with random input
+    - Only outputs the same thing over and over, regardless of input
+model9
+    - Different parameters:
+        - Increased num encoder and decoder layers to 4 from 2
+        - Decreased forward expansion from 4 to 2 (i.e. 1024 dimensional linear layers)
+        - Decreased batch size to 8 from 16
