@@ -2,6 +2,8 @@
 
 from pathlib import Path
 import sys
+
+from spleeter.separator import Separator
 sys.path.insert(1, str(Path().resolve().parent) + r'\Preprocessing')
 import os
 from chart_functions import *
@@ -180,6 +182,19 @@ def get_list_of_ogg_files(unprocessed_path):
                         
     return ogg_file_paths, processed_paths
 
+# def source_seperate_ogg(ogg_list: list):
+    # separator = Separator('spleeter:4stems')
+    # audio_loader = AudioAdapter.default()
+    # sample_rate = 22050
+    # range_ = 32767
+
+    # for ogg in ogg_list:
+        # waveform, _ = audio_loader.load(ogg, sample_rate=sample_rate)
+        # prediction = separator.separate(waveform)
+        # prediction['other'] = prediction['other']*range_
+        # write()
+
+
 def populate_processed_folder_with_spectrograms(unprocessed_path, REPLACE=True):
     '''
     Takes all the .ogg files in unprocessed_path (besides source separated files), computes their spectrogram,
@@ -198,11 +213,12 @@ def populate_processed_folder_with_spectrograms(unprocessed_path, REPLACE=True):
         if not os.path.exists(processed_paths[i]): # if the processed folder doesn't exist
             continue
         if not REPLACE:     # if processed folder has already been populated
-            if os.path.exists(processed_paths[i] / 'spectrogram.npy'):
+            if os.path.exists(processed_paths[i] / 'spectrogram.npy'):  # NOTE: Change this because everything already has spectrogram
                 continue
 
         spec = compute_mel_spectrogram(ogg_file_paths[i])  # Get spectrogram
         
+        # NOTE: Maybe get rid of this, but make sure it doesn't break anything down the pipeline
         # Append 70ms of silence at beginnign and end
         if not APPEND_ARR_CREATED:  # Only define once
             append_arr = np.ones((spec.shape[0],7)) * np.min(spec)
@@ -210,7 +226,7 @@ def populate_processed_folder_with_spectrograms(unprocessed_path, REPLACE=True):
         spec = np.c_[append_arr, spec, append_arr]
 
         # Save to appropriate processed folder
-        np.save(str(processed_paths[i] / 'spectrogram.npy'), spec)
+        np.save(str(processed_paths[i] / 'spectrogram.npy'), spec)  # NOTE: Change to something like 'source_separated_spec.npy'
 
     return
 

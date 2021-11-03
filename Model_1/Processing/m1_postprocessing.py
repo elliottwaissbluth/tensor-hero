@@ -277,11 +277,11 @@ if __name__ == '__main__':
     trg_vocab_size = 435  # <output length>
     embedding_size = 512
     num_heads = 8
-    num_encoder_layers = 4
-    num_decoder_layers = 4
+    num_encoder_layers = 2
+    num_decoder_layers = 2
     dropout = 0.1
     max_len = 500
-    forward_expansion = 1024
+    forward_expansion = 2048
 
     model = Transformer(
         embedding_size,
@@ -305,6 +305,6 @@ if __name__ == '__main__':
                  'MediaType' : 'cd',
                  'MusicStream' : 'song.ogg'}
 
-    model.load_state_dict(torch.load(r'C:\Users\ewais\Documents\GitHub\tensor-hero\Model_1\saved models\model9\model9.pt'))
+    model.load_state_dict(torch.load(r'C:\Users\ewais\Documents\GitHub\tensor-hero\Model_1\saved models\model10\model10.pt'))
 
     full_song_prediction(song_path, model, device, 432, 500, song_metadata, outfolder)
