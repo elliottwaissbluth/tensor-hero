@@ -2,7 +2,7 @@ import numpy as np
 from pathlib import Path
 
 
-def transition_table_valueAdder(note_array, trans_table=trans_table):
+def transition_table_valueAdder(note_array, trans_table):
     """ 
     Function to update the first note table and the transition probability table
     Function will remove zeros for the note_array to simplify sorting
@@ -71,7 +71,7 @@ def create_trans_table(track_pack_path, trans_table):
 
 
 track_pack_path = Path('/Users/forrestbrandt/Documents/Berkeley/Fall_2021/TensorHero/Condensed Notes')
-trans_table = np.zeros((33,33))
+trans_table = np.zeros((33,32))
 trans_table = create_trans_table(track_pack_path,trans_table)
 prob_table = prob_calc(trans_table)
 prob_table.sum(axis=0)
