@@ -16,4 +16,6 @@ val_key.pkl
 **/Model_1/runs
 onsets.pkl
 songs.pkl
+**/pretrained_models*
 **.pt
+

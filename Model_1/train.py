@@ -23,11 +23,11 @@ if __name__ == '__main__':
     # control the parameters of the run here
     params = {
         'training_data' : 'train',     # CHANGEME (these parameters must be changed each experiment)
-        'model_name' : 'model9',        # CHANGEME
+        'model_name' : 'model10',        # CHANGEME
         'optimizer' : 'Adam',           # CHANGEME (maybe not this one, but you do have to fill it in manually)
 
-        'num_epochs' : 20,
-        'batch_size' : 8,
+        'num_epochs' : 200,
+        'batch_size' : 16,
         'shuffle' : True,
         'num_workers' : 4,
         'drop_last' : True,
@@ -39,12 +39,12 @@ if __name__ == '__main__':
         'pad_idx' : 434,
         'embedding_size' : 512,
 
-        'lr' : 3e-4,
+        'lr' : 1e-4,
         'num_heads' : 8,
-        'num_encoder_layers' : 4,
-        'num_decoder_layers' : 4,
+        'num_encoder_layers' : 2,
+        'num_decoder_layers' : 2,
         'dropout' : 0.1,
-        'forward_expansion' : 2,
+        'forward_expansion' : 4,
 
         'date' : datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
     }

@@ -108,7 +108,7 @@ def process_spectrogram(spec):
     spec = (spec+80) / 80   # Regularize
     return spec
 
-def populate_model_1_training_data(training_data_path, model_1_training_path, REPLACE=False):
+def populate_model_1_training_data(training_data_path, model_1_training_path, spec_file_name = 'spectrogram.npy', REPLACE=False):
     '''
     Takes the spectrogram.npy files and the notes.npy files from the processed training data and
     slices them into torch tensors representing 400ms of data. Creates train, val, and test
@@ -150,10 +150,10 @@ def populate_model_1_training_data(training_data_path, model_1_training_path, RE
     _, processed_list = get_list_of_ogg_files(unprocessed_path)
 
     # Get paths of notes and corresponding paths of spectrograms
-    spec_paths = [song / 'spectrogram.npy' for song in processed_list]
+    spec_paths = [song / spec_file_name for song in processed_list]  # NOTE: Switch to different spectrogram
     notes_paths = [song / 'notes_simplified.npy' for song in processed_list]
 
-    def process_spectrogram(spec):
+    def process_spectrogram(spec):  # NOTE: Change this for the new spectrogram computation function 
         spec = spec[:, 7:-7]    # Take off the padding
         spec = (spec+80) / 80   # Regularize
         return spec
@@ -211,6 +211,7 @@ def populate_model_1_training_data(training_data_path, model_1_training_path, RE
     val_key = {}
 
     for i in tqdm(range(len(notes_paths))):
+        # NOTE: if spectrogram computation changes, this needs to change as well
         # Process spectrogram
         try:
             spec = np.load(spec_paths[i])
