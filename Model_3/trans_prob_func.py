@@ -2,7 +2,7 @@ import numpy as np
 from pathlib import Path
 
 
-def transition_table_valueAdder(note_array, trans_table):
+def transition_table_valueAdder(note_array, trans_table=trans_table):
     """ 
     Function to update the first note table and the transition probability table
     Function will remove zeros for the note_array to simplify sorting
@@ -16,11 +16,11 @@ def transition_table_valueAdder(note_array, trans_table):
     note_array[note_array == 218] = 32
     
     # update first_noteArray
-    trans_table[0][int(note_array[0])] += 1 # adding first note to transition table
+    trans_table[32][int(note_array[0])-1] += 1 # adding first note to transition table
 
     # loop through note array and update trans_table - start with index 1
     for i in range(1, len(note_array)):
-        trans_table[int(note_array[i-1])][int(note_array[i])] += 1
+        trans_table[int(note_array[i-1]-1)][int(note_array[i])-1] += 1
     
     return trans_table
 
