@@ -19,3 +19,7 @@ songs.pkl
 **/pretrained_models*
 **.pt
 
+Shared_Functionality/Preprocessing/Archive/.guitar.ogg.icloud
+Shared_Functionality/Preprocessing/Archive/song npy description/.song.npy.icloud
+Shared_Functionality/Preprocessing/Prototypes/note simplification/test/1. Andy McKee - Ouray/.song.npy.icloud
+Shared_Functionality/Preprocessing/Prototypes/note simplification/test/1. Joe Satriani - The Forgotten (Part One + Part Two)/.song.npy.icloud
