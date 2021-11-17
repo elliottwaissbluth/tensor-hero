@@ -2,11 +2,25 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="5a89e771-4e3d-44b8-a8db-6786553859df" name="Default" comment="">
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/Model_1/Prototyping (Annais)/pre_post_processing_helper_functions.py" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/Model_1/Prototyping (Annais)/pre_post_processing_helper_refactor_testing.ipynb" />
-      <change type="DELETED" beforePath="$PROJECT_DIR$/Shared_Functionality/Preprocessing/Archive/song npy description/song.npy" afterPath="" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/Shared_Functionality/Data Viz/Prototyping/data_viz.ipynb" afterPath="$PROJECT_DIR$/Shared_Functionality/Data Viz/Prototyping/data_viz.ipynb" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/Shared_Functionality/Preprocessing/Prototypes/recompute_spectrogram.ipynb" afterPath="$PROJECT_DIR$/Shared_Functionality/Preprocessing/Prototypes/recompute_spectrogram.ipynb" />
+      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/Shared_Functionality/Model_Evaluation/model_evaluations.py" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/Generated Songs/test_song/song.ogg" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/Generated Songs/test_song_model10/song.ogg" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/Model_1/Prototyping/toy training data/1. Andy McKee - Ouray/song.npy" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/Model_1/Prototyping/toy training data/1. Andy McKee - Ouray/spectrogram.npy" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/Shared_Functionality/Exploration/Onset_explore.ipynb" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/Source Separation/demucs/bass.mp3" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/Source Separation/demucs/drums.mp3" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/Source Separation/demucs/other.mp3" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/Source Separation/demucs/vocals.mp3" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/Source Separation/song.mp3" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/Source Separation/song.ogg" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/Source Separation/spleeter/other.wav" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/Source Separation/spleeter/song_other.wav" afterPath="" />
+      <change type="MOVED" beforePath="$PROJECT_DIR$/Generated Songs/test_song/notes.chart" afterPath="$PROJECT_DIR$/Generated Songs/test/test_song/notes.chart" />
+      <change type="MOVED" beforePath="$PROJECT_DIR$/Generated Songs/test_song_model10/notes.chart" afterPath="$PROJECT_DIR$/Generated Songs/test/test_song_model10/notes.chart" />
+      <change type="MOVED" beforePath="$PROJECT_DIR$/Model_1/model1_metrics.py" afterPath="$PROJECT_DIR$/Shared_Functionality/Model_Evaluation/model_metric_functions.py" />
+      <change type="MOVED" beforePath="$PROJECT_DIR$/Shared_Functionality/onset_functions_prototype.ipynb" afterPath="$PROJECT_DIR$/Shared_Functionality/Exploration/onset_functions_prototype.ipynb" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="TRACKING_ENABLED" value="true" />
@@ -17,14 +31,36 @@
   </component>
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
-      <file leaf-file-name="pre_post_processing_helper_functions.py" pinned="false" current-in-tab="true">
-        <entry file="file://$PROJECT_DIR$/Model_1/Prototyping (Annais)/pre_post_processing_helper_functions.py">
+      <file leaf-file-name="model_metric_functions.py" pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/Shared_Functionality/Model_Evaluation/model_metric_functions.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="255">
-              <caret line="17" column="13" lean-forward="true" selection-start-line="17" selection-start-column="13" selection-end-line="17" selection-end-column="13" />
+            <state relative-caret-position="300">
+              <caret line="20" column="39" lean-forward="false" selection-start-line="20" selection-start-column="39" selection-end-line="20" selection-end-column="39" />
               <folding>
-                <element signature="e#221#239#0" expanded="true" />
+                <element signature="e#31#49#0" expanded="true" />
               </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="model_evaluations.py" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/Shared_Functionality/Model_Evaluation/model_evaluations.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="175">
+              <caret line="44" column="4" lean-forward="false" selection-start-line="44" selection-start-column="4" selection-end-line="45" selection-end-column="36" />
+              <folding>
+                <element signature="e#0#18#0" expanded="true" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="preprocess_functions.py" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/Shared_Functionality/Preprocessing/Preprocessing Functions/preprocess_functions.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="-825">
+              <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
+              <folding />
             </state>
           </provider>
         </entry>
@@ -34,8 +70,8 @@
   <component name="FileTemplateManagerImpl">
     <option name="RECENT_TEMPLATES">
       <list>
-        <option value="Python Script" />
         <option value="Jupyter Notebook" />
+        <option value="Python Script" />
       </list>
     </option>
   </component>
@@ -48,6 +84,8 @@
         <option value="$PROJECT_DIR$/Shared_Functionality/Data Viz/Prototyping/data_viz.ipynb" />
         <option value="$PROJECT_DIR$/Model_1/Prototyping (Annais)/prototyping.ipynb" />
         <option value="$PROJECT_DIR$/Model_1/Prototyping (Annais)/prototyping.py" />
+        <option value="$PROJECT_DIR$/Model_1/Prototyping (Annais)/pre_post_processing_helper_functions.py" />
+        <option value="$PROJECT_DIR$/Shared_Functionality/Model_Evaluation/model_evaluations.py" />
       </list>
     </option>
   </component>
@@ -87,25 +125,55 @@
             <path>
               <item name="tensor-hero" type="b2602c69:ProjectViewProjectNode" />
               <item name="tensor-hero" type="462c0819:PsiDirectoryNode" />
-              <item name="Model_1" type="462c0819:PsiDirectoryNode" />
+              <item name="Generated Songs" type="462c0819:PsiDirectoryNode" />
             </path>
             <path>
               <item name="tensor-hero" type="b2602c69:ProjectViewProjectNode" />
               <item name="tensor-hero" type="462c0819:PsiDirectoryNode" />
               <item name="Model_1" type="462c0819:PsiDirectoryNode" />
-              <item name="Prototyping (Annais)" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="tensor-hero" type="b2602c69:ProjectViewProjectNode" />
+              <item name="tensor-hero" type="462c0819:PsiDirectoryNode" />
+              <item name="Shared_Functionality" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="tensor-hero" type="b2602c69:ProjectViewProjectNode" />
+              <item name="tensor-hero" type="462c0819:PsiDirectoryNode" />
+              <item name="Shared_Functionality" type="462c0819:PsiDirectoryNode" />
+              <item name="Model_Evaluation" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="tensor-hero" type="b2602c69:ProjectViewProjectNode" />
+              <item name="tensor-hero" type="462c0819:PsiDirectoryNode" />
+              <item name="Shared_Functionality" type="462c0819:PsiDirectoryNode" />
+              <item name="Preprocessing" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="tensor-hero" type="b2602c69:ProjectViewProjectNode" />
+              <item name="tensor-hero" type="462c0819:PsiDirectoryNode" />
+              <item name="Shared_Functionality" type="462c0819:PsiDirectoryNode" />
+              <item name="Preprocessing" type="462c0819:PsiDirectoryNode" />
+              <item name="Preprocessing Functions" type="462c0819:PsiDirectoryNode" />
             </path>
           </expand>
           <select />
         </subPane>
       </pane>
-      <pane id="Scope" />
       <pane id="Scratches" />
+      <pane id="Scope" />
     </panes>
   </component>
   <component name="PropertiesComponent">
     <property name="SearchEverywhereHistoryKey" value="spectrogram&#9;FILE&#9;file:///Users/annais.paetsch/Documents/GitHub/tensor-hero/Shared_Functionality/Preprocessing/Prototypes/recompute_spectrogram.ipynb" />
     <property name="settings.editor.selected.configurable" value="com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable" />
+  </component>
+  <component name="RecentsManager">
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/Generated Songs/test" />
+      <recent name="$PROJECT_DIR$/Shared_Functionality/Model_Evaluation" />
+      <recent name="$PROJECT_DIR$/Shared_Functionality/Exploration" />
+    </key>
   </component>
   <component name="RunDashboard">
     <option name="ruleStates">
@@ -166,20 +234,20 @@
       <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.24982105" sideWeight="0.5" order="0" side_tool="false" content_ui="combo" />
       <window_info id="TODO" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
       <window_info id="Event Log" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="true" content_ui="tabs" />
+      <window_info id="Find" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.32998747" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
+      <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32998747" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
       <window_info id="Version Control" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Python Console" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
-      <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.32998747" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
       <window_info id="Structure" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
       <window_info id="Terminal" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
-      <window_info id="Favorites" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="2" side_tool="true" content_ui="tabs" />
       <window_info id="Debug" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.39899623" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
-      <window_info id="Data View" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.22834645" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
+      <window_info id="Favorites" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="2" side_tool="true" content_ui="tabs" />
+      <window_info id="Data View" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.22834645" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
       <window_info id="Cvs" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="4" side_tool="false" content_ui="tabs" />
       <window_info id="Message" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
       <window_info id="Commander" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.4" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
       <window_info id="Inspection" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.4" sideWeight="0.5" order="5" side_tool="false" content_ui="tabs" />
       <window_info id="Hierarchy" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="2" side_tool="false" content_ui="combo" />
-      <window_info id="Find" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
       <window_info id="Ant Build" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
     </layout>
   </component>
@@ -200,23 +268,51 @@
     <watches-manager />
   </component>
   <component name="editorHistoryManager">
-    <entry file="file://$PROJECT_DIR$/Model_1/Prototyping (Annais)/pre_post_processing_helper_functions.py">
+    <entry file="file://$PROJECT_DIR$/Shared_Functionality/Model_Evaluation/model_metric_functions.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="2025">
-          <caret line="135" column="33" lean-forward="false" selection-start-line="135" selection-start-column="33" selection-end-line="135" selection-end-column="33" />
+        <state relative-caret-position="0">
+          <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
           <folding>
-            <element signature="e#221#239#0" expanded="true" />
+            <element signature="e#31#49#0" expanded="true" />
           </folding>
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/Shared_Functionality/Data Viz/Prototyping/notes.npy">
+    <entry file="file://$PROJECT_DIR$/Shared_Functionality/Model_Evaluation/model_metric_functions.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="975">
+          <caret line="67" column="14" lean-forward="false" selection-start-line="67" selection-start-column="4" selection-end-line="67" selection-end-column="14" />
+          <folding>
+            <element signature="e#31#49#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/Shared_Functionality/Model_Evaluation/model_evaluations.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="435">
+          <caret line="29" column="12" lean-forward="true" selection-start-line="29" selection-start-column="12" selection-end-line="29" selection-end-column="12" />
+          <folding>
+            <element signature="e#0#18#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/Model_1/Prototyping (Annais)/pre_post_processing_helper_functions.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="0">
           <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/Model_1/Prototyping (Annais)/pre_post_processing_helper_functions.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="2025">
+          <caret line="135" column="33" lean-forward="false" selection-start-line="135" selection-start-column="33" selection-end-line="135" selection-end-column="33" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/Shared_Functionality/Data Viz/Prototyping/notes.npy" />
     <entry file="file://$PROJECT_DIR$/Shared_Functionality/Preprocessing/Preprocessing Functions/audio_functions.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="0">
@@ -224,20 +320,8 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/Shared_Functionality/Data Viz/Prototyping/data_viz.ipynb">
-      <provider selected="true" editor-type-id="ipnb-editor">
-        <state>
-          <selected id="3" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/Shared_Functionality/Data Viz/data_viz_functions.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="0">
-          <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
-        </state>
-      </provider>
-    </entry>
+    <entry file="file://$PROJECT_DIR$/Shared_Functionality/Data Viz/Prototyping/data_viz.ipynb" />
+    <entry file="file://$PROJECT_DIR$/Shared_Functionality/Data Viz/data_viz_functions.py" />
     <entry file="file://$PROJECT_DIR$/Shared_Functionality/Preprocessing/Prototypes/recompute_spectrogram.ipynb">
       <provider selected="true" editor-type-id="ipnb-editor">
         <state>
@@ -276,9 +360,54 @@
     <entry file="file://$PROJECT_DIR$/Model_1/Prototyping (Annais)/pre_post_processing_helper_functions.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="255">
-          <caret line="17" column="13" lean-forward="true" selection-start-line="17" selection-start-column="13" selection-end-line="17" selection-end-column="13" />
+          <caret line="17" column="13" lean-forward="false" selection-start-line="17" selection-start-column="13" selection-end-line="17" selection-end-column="13" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/Model_1/model.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="0">
+          <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
           <folding>
-            <element signature="e#221#239#0" expanded="true" />
+            <element signature="e#0#12#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/Model_1/train.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="0">
+          <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
+          <folding>
+            <element signature="e#0#35#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/Shared_Functionality/Preprocessing/Preprocessing Functions/preprocess_functions.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="-825">
+          <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/Shared_Functionality/Model_Evaluation/model_evaluations.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="175">
+          <caret line="44" column="4" lean-forward="false" selection-start-line="44" selection-start-column="4" selection-end-line="45" selection-end-column="36" />
+          <folding>
+            <element signature="e#0#18#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/Shared_Functionality/Model_Evaluation/model_metric_functions.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="300">
+          <caret line="20" column="39" lean-forward="false" selection-start-line="20" selection-start-column="39" selection-end-line="20" selection-end-column="39" />
+          <folding>
+            <element signature="e#31#49#0" expanded="true" />
           </folding>
         </state>
       </provider>
