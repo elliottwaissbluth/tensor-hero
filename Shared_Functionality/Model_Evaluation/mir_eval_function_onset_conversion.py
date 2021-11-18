@@ -49,8 +49,8 @@ def eval_fmeas_precision_recall(onset_true, onset_estimate, window = .05):
         = (# true positives)/(# true positives + # false negatives)
 
     '''
-
-    mir_eval.onset.validate(onsets, onsets)
+    
+    mir_eval.onset.validate(onset_true, onset_estimate)
     error_metrics = mir_eval.onset.f_measure(onset_true, onset_estimate, window=0.05)
     
     return error_metrics
