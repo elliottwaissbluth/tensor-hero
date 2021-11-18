@@ -136,7 +136,7 @@ def generate_song(song_path,
                   artist = 'Forrest'):
     '''
     Takes the song present at song_path, uses onset_computation_function to compute onsets, uses note_generation_function
-    to generate notes, then writes the song to an outfolder at ~/Model_3/Generated Songs/<outfile_song_name>
+    to generate notes, then writes the song to an outfolder at ~/Model_3/Generated Songs - TO BE DELETED/<outfile_song_name>
 
     ~~~~ ARGUMENTS ~~~~
     - song_path : Path or str

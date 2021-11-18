@@ -23,7 +23,7 @@ def evaluate_model_run(model_run_path: str):
         # Add path to predicted notes array
         pred_notes_path_list.append(song_folder / 'notes_array.npy')
         # Add path to true notes array from metadata.pkl
-        with open('metadata.pkl', 'rb') as f:
+        with open(song_folder / 'metadata.pkl', 'rb') as f:
             temp_metadata_dict = pickle.load(f)
         true_notes_path_list.append(temp_metadata_dict['path_to_original_notes_array'])
 
@@ -84,32 +84,8 @@ def evaluate_model_run(model_run_path: str):
 
 
 
-
-
-
-
-
-
-model_run_metric_dict = evaluate_model_run('/Users/annais.paetsch/Documents/GitHub/tensor-hero/Generated Songs/model1_post_source_sep')
-
-
-# ---------------------------------------------------
-
-# MAKE DUMMY DATA
-test_metadata_path = Path('/Users/annais.paetsch/Documents/GitHub/tensor-hero/Generated Songs/model1_post_source_sep/Dummy_Song01')
-
-test_metadata_pkl = {'path_to_original_chart': Path().resolve().parent,
-                      'path_to_original_notes_array': Path().resolve().parent}
-test_notes_array = np.zeros(10)
-
-with open(test_metadata_path / 'metadata.pkl', 'wb') as f:
-    pickle.dump(test_metadata_pkl, f)
-f.close()
-
-with open(test_metadata_path / 'notes_array.npy', 'wb') as f:
-    np.save(f, test_notes_array)
-f.close()
-
-
+if __name__ == '__main__':
+    # todo: Must change for path for local machine
+    model_run_metric_dict = evaluate_model_run('/Users/annais.paetsch/Documents/GitHub/tensor-hero/Experiments/Generated_Songs/m1_pre_sep')
 
 
