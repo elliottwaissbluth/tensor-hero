@@ -92,16 +92,29 @@ def generate_notes(onset, interval_length=100):
         note_array.append(curr_note)
     else:
         curr_note = random.randint(6,31)
-        note_array.append(curr_note)
-    for i in range(1,len(onset)-1): # since we’ll be forward looking by one
+        note_array.append(curr_note)    
+    
+    
+    for i in range(1,len(onset)-1): # since we'll be forward looking by one
         curr_note = calc_note(i,onset, curr_note)
         note_array.append(curr_note)
+
+    # Looks at last note and compares will repeat 
+    if (note_array[-1] < 6) :
+        curr_note = random.randint(1,5)
+        note_array.append(curr_note)
+    else:
+        curr_note = random.randint(6,31)
+        note_array.append(curr_note)
+   
     return note_array
 
 def calc_note(idx, onset, curr_note, interval_length=100):
     # if short interval and current note is a single note
     n = random.random()
-    if (onset[idx+1] - onset[idx] < interval_length) & (curr_note <= 5):
+    
+    # short and short = short - no change in state
+    if (onset[idx] - onset[idx-1] < interval_length) & (onset[idx+1] - onset[idx] < interval_length): # changed conditional to or
         if n < (1/3): # note repeats
             curr_note = curr_note
         elif n < (2/3): # note goes up (unless current note is 5)
@@ -114,18 +127,32 @@ def calc_note(idx, onset, curr_note, interval_length=100):
                 curr_note = curr_note + 1
             else:
                 curr_note = curr_note - 1
-    # if short interval but current note is a chord, goes back to single note
-    elif (onset[idx+1] - onset[idx] < interval_length):
-        curr_note = random.randint(1,5)
-    elif (onset[idx+1] - onset[idx] >= interval_length) & (5 < curr_note < 32):
-        n = random.random()
-        if n > .25:
-            curr_note = curr_note
-        else:
+    
+    # short and long = short - no change
+    elif (onset[idx] - onset[idx-1] < interval_length) & (onset[idx+1] - onset[idx] > interval_length):
+        if n < (1/3): # note repeats
             curr_note = random.randint(6,31)
+        elif n < (2/3): # note goes up (unless current note is 5)
+            if curr_note == 5:
+                curr_note = curr_note - 1
+            else:
+                curr_note = curr_note + 1
+        else: # note goes down (unless current note is 1)
+            if curr_note == 1:
+                curr_note = curr_note + 1
+            else:
+                curr_note = curr_note - 1
+                
+    # long and short = short - change 
+    elif (onset[idx] - onset[idx-1] > interval_length) & (onset[idx+1] - onset[idx] < interval_length):
+        curr_note = random.randint(1,5)
+        
+    # Long and Long = Long - no change
     else:
         curr_note = random.randint(6,31)
     return curr_note
+
+
 
 def generate_song(song_path, 
                   note_generation_function, 
@@ -136,7 +163,7 @@ def generate_song(song_path,
                   artist = 'Forrest'):
     '''
     Takes the song present at song_path, uses onset_computation_function to compute onsets, uses note_generation_function
-    to generate notes, then writes the song to an outfolder at ~/Model_3/Generated Songs - TO BE DELETED/<outfile_song_name>
+    to generate notes, then writes the song to an outfolder at ~/Model_3/Generated Songs/<outfile_song_name>
 
     ~~~~ ARGUMENTS ~~~~
     - song_path : Path or str
