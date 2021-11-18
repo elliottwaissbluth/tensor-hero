@@ -1,41 +1,14 @@
 import numpy as np
+import pickle
 import pandas as pd
+import mir_eval
+from pathlib import Path
+import os
+import sys
+sys.path.insert(1, r'/Users/annais.paetsch/Documents/GitHub/tensor-hero/Shared_Functionality/Model_Evaluation')
 from model_metric_functions import *
+from mir_eval_function_onset_conversion import *
 
-
-# For each model
-# For each run
-# Get relevant folder with predicted notes for respective model & run
-# Output list of paths with folder holding predicted notes for each model to be evaluated
-
-
-# Create empty dict:
-    # for each model, have three KPIs
-
-
-# For each model run folder to be evaluated
-    # Create empty freq_saturation_arr
-    # Create empty freq_table_df
-    # Create empty freq_type_table_df
-
-    # Get list of paths to each song for predicted
-    # Get list of paths to each song for truth
-
-    # For each song: get matching predicted notes numpy array and true notes numpy array
-        # Call freq_saturation for ratio
-        # Add value to freq_saturation np array
-
-        # Call freq_table
-        # Add to df on third dimension
-
-        # Call freq_type_table
-        # Add to df on third dimension
-
-        # Extension
-
-# Add avg. freq_saturation to model run
-# Add avg. freq_table to model run
-# Add avg. freq_type_table to model run
 
 
 
@@ -45,9 +18,22 @@ def evaluate_model_run(model_run_path: str):
     pred_notes_path_list = [] # todo
     true_notes_path_list = [] # todo
 
+    path = Path(model_run_path)
+    for song_folder in [path / x for x in os.listdir(path)]:
+        # Add path to predicted notes array
+        pred_notes_path_list.append(song_folder / 'notes_array.npy')
+        # Add path to true notes array from metadata.pkl
+        with open('metadata.pkl', 'rb') as f:
+            temp_metadata_dict = pickle.load(f)
+        true_notes_path_list.append(temp_metadata_dict['path_to_original_notes_array'])
+
+
     freq_saturation_arr = np.zeros(shape=(1, len(pred_notes_path_list)))
     freq_table_arr = np.zeros(shape=(1, len(pred_notes_path_list)))
     freq_type_table_arr = np.zeros(shape=(1, len(pred_notes_path_list)))
+    f1_arr = np.zeros(shape=(1, len(pred_notes_path_list)))
+    precision_arr = np.zeros(shape=(1, len(pred_notes_path_list)))
+    recall_arr = np.zeros(shape=(1, len(pred_notes_path_list)))
 
 
     # Iterate through each predicted song
@@ -57,7 +43,8 @@ def evaluate_model_run(model_run_path: str):
         temp_true_notes = true_notes_path_list[i]
 
         # Convert our arrays to format required for mir_eval functions
-        # todo
+        temp_pred_onset = notes_to_onset(note_array=temp_pred_notes)
+        temp_true_onset = notes_to_onset(note_array=temp_true_notes)
 
         # Get all evaluation metric / output for given song
         # Get custom evaluation metrics
@@ -65,26 +52,33 @@ def evaluate_model_run(model_run_path: str):
         temp_freq_table = freq_table(truth=temp_true_notes,output=temp_pred_notes)
         temp_freq_type_table = freq_type_table(truth=temp_true_notes,output=temp_pred_notes)
         # Get mir_eval onset evaluation metrics
-        # todo: Call mir_eval functions
+        temp_onset_metrics = eval_fmeas_precision_recall(onset_true=temp_true_onset, onset_estimate=temp_pred_onset,
+                                                         window=.05)  # returns [f_measure, precision, recall]
 
         # For each evaluation metrics: Add all metric values for given song to array of evaluation metrics
         freq_saturation_arr[i] = temp_freq_saturation
         freq_table_arr[i] = temp_freq_table
         freq_type_table_arr[i] = temp_freq_type_table
-        # todo: Add mir_eval values to collections for each metric
+        f1_arr = onset_eval_metrics[0]
+        precision_arr = onset_eval_metrics[1]
+        recall_arr = onset_eval_metrics[2]
 
 
     # Average each evaluation metric across all songs for given model run
     avg_model_run_freq_saturation = np.mean(freq_saturation_arr)
     avg_model_run_freq_table = 0 #todo
     avg_model_run_freq_type_table = 0 #todo
-    # todo: avg for mir_eval metrics
+    avg_model_run_f1 = np.mean(f1_arr)
+    avg_model_run_precision = np.mean(precision_arr)
+    avg_model_run_recall = np.mean(recall_arr)
 
     # Add all values to dictionary
     model_run_metrics['freq_saturation'] = avg_model_run_freq_saturation
     model_run_metrics['freq_table'] = avg_model_run_freq_table
     model_run_metrics['freq_type_table'] = avg_model_run_freq_type_table
-    #todo
+    model_run_metrics['f1'] = avg_model_run_f1
+    model_run_metrics['precision'] = avg_model_run_precision
+    model_run_metrics['recall'] = avg_model_run_recall
 
     return model_run_metrics
 
@@ -94,6 +88,27 @@ def evaluate_model_run(model_run_path: str):
 
 
 
+
+
+model_run_metric_dict = evaluate_model_run('/Users/annais.paetsch/Documents/GitHub/tensor-hero/Generated Songs/model1_post_source_sep')
+
+
+# ---------------------------------------------------
+
+# MAKE DUMMY DATA
+test_metadata_path = Path('/Users/annais.paetsch/Documents/GitHub/tensor-hero/Generated Songs/model1_post_source_sep/Dummy_Song01')
+
+test_metadata_pkl = {'path_to_original_chart': Path().resolve().parent,
+                      'path_to_original_notes_array': Path().resolve().parent}
+test_notes_array = np.zeros(10)
+
+with open(test_metadata_path / 'metadata.pkl', 'wb') as f:
+    pickle.dump(test_metadata_pkl, f)
+f.close()
+
+with open(test_metadata_path / 'notes_array.npy', 'wb') as f:
+    np.save(f, test_notes_array)
+f.close()
 
 
 
