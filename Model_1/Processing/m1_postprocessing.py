@@ -56,7 +56,7 @@ notes_to_chart_strings = {
     32 : ['7']
 }
 
-def m1_tensor_to_note_array(output):
+def m1_tensor_to_note_array(output, PRINT=False):
     '''
     m1 tensors are returned from model 1.
     not currently designed to handle batches.
@@ -89,7 +89,9 @@ def m1_tensor_to_note_array(output):
     notes_array = np.zeros(400)
     for pair in pairs:
         notes_array[pair[0]-32] = pair[1]
-    print(notes_array)
+    
+    if PRINT:
+        print(notes_array)
 
     return notes_array
 
@@ -165,6 +167,8 @@ def predict(model, device, input, sos_idx, max_len):
         output = model(input, prediction)
         pred = torch.tensor([torch.argmax(output[0,-1,:]).item()]).unsqueeze(0).to(device)
         prediction = torch.cat((prediction, pred), dim=1)
+        if pred == 433:
+            break
         # print(torch.argmax(output[0,-1,:]).item())
 
         # if i > 0 and torch.argmax(output[0,-1,:]).item() == 433:
@@ -185,7 +189,7 @@ def write_song_from_notes_array(song_metadata, notes_array, outfolder):
         - array of notes with each element corresponding to a 10ms time bin
     - outfolder : Path
         - folder to save the chart to
-        - should already exis
+        - should already exist
     '''
     f = open(str(outfolder / 'notes.chart'), 'w')
 
@@ -214,7 +218,7 @@ def write_song_from_notes_array(song_metadata, notes_array, outfolder):
     f.close()
         
 
-def full_song_prediction(song_path, model, device, sos_idx, max_len, song_metadata, outfolder):
+def full_song_prediction(song_path, model, device, sos_idx, max_len, song_metadata, outfolder, PRINT=False):
     '''
     Reads the song at song_path, uses model to predict notes over time, saves .chart to outfolder
     and copies song there as well. This outfolder can then be dropped into Clone Hero's song dir.
@@ -253,7 +257,8 @@ def full_song_prediction(song_path, model, device, sos_idx, max_len, song_metada
     for i in range(full_spec.shape[0]):
         print(f'predicting segment {i}/{full_spec.shape[0]}')
         prediction = predict(model, device, full_spec[i,...], sos_idx, max_len)
-        print('m1 notes tensor: {}'.format(prediction))
+        if PRINT:
+            print('m1 notes tensor: {}'.format(prediction))
         notes_array[(i*full_spec.shape[2]):((i+1)*full_spec.shape[2])] = m1_tensor_to_note_array(prediction)
 
     # Write the outfolder
@@ -263,6 +268,7 @@ def full_song_prediction(song_path, model, device, sos_idx, max_len, song_metada
     write_song_from_notes_array(song_metadata, notes_array, outfolder)
     # Copy the audio file into the outfolder
     shutil.copyfile(str(song_path), str(outfolder / 'song.ogg'))
+    return notes_array
 
 if __name__ == '__main__':
 
@@ -307,4 +313,4 @@ if __name__ == '__main__':
 
     model.load_state_dict(torch.load(r'C:\Users\ewais\Documents\GitHub\tensor-hero\Model_1\saved models\model10\model10.pt'))
 
-    full_song_prediction(song_path, model, device, 432, 500, song_metadata, outfolder)
+    _ = full_song_prediction(song_path, model, device, 432, 500, song_metadata, outfolder)
