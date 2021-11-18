@@ -18,7 +18,7 @@ onsets.pkl
 songs.pkl
 **/pretrained_models*
 **.pt
-**/Experiments/Test_Songs/
+**spectrogram.npy
 
 Shared_Functionality/Preprocessing/Archive/.guitar.ogg.icloud
 Shared_Functionality/Preprocessing/Archive/song npy description/.song.npy.icloud
