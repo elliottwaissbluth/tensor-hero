@@ -91,15 +91,30 @@ def create_scatter_axes(notes, ax=None):
     ax.set_axisbelow(True)
     ax.set_yticklabels([])
     ax.set_xlim(0, len(notes))
-    ax.scatter(x, y, edgecolors='k', color=c, s=160)
+    
 
+    ax.scatter(x, y, edgecolors='k', color=c, s=160)
+    
     # Plot open notes
     for coord in coords:
         ax.plot(coord[0], coord[1], linewidth=3, color='#c000eb')
 
     return ax
 
-def plot_chart(ground_truth, candidate=None, audio=None):
+def plot_chart(ground_truth, candidate, audio=None):
+    '''
+   Plots a chart for ground truth notes array and prediction (AKA candidate) array.
+
+    ~~~~ ARGUMENTS ~~~~
+    ground truth : numpy array
+    candidate/prediction : numpy array
+
+    
+    ~~~~ RETURNS ~~~~
+    plotted visual of truth vs. prediction
+        '''
+        
+    
     num_subplots = 1 + int(candidate is not None) + int(audio is not None)
 
     fig, axes = plt.subplots(num_subplots)
@@ -110,14 +125,21 @@ def plot_chart(ground_truth, candidate=None, audio=None):
     axes[0].set_title('Ground Truth')
 
     # Compare the candidate
+
     if candidate is not None:
         create_scatter_axes(candidate, axes[1])
+
         axes[1].set_title('Candidate')
+    
+
 
     if audio is not None:
         axes[2].imshow(audio, aspect='auto', origin='lower')
     
     fig.align_xlabels(axes)
+
+
+
     plt.show()
 
 if __name__ == '__main__':
