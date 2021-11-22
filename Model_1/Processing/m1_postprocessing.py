@@ -71,24 +71,34 @@ def m1_tensor_to_note_array(output):
     -   indices represent time in 10ms bins, values represent notes
     '''
     output = output.detach().cpu().numpy()
-    # Remove padding, <sos>, <eos>
-    output = np.delete(output, np.where(output == 432))
-    output = np.delete(output, np.where(output == 434))
+    # Remove padding, <sos>, <pad>
+    output = np.delete(output, np.where(output == 432)) # <sos>
+    '''
+    # NOTE: The padding and EOS are removed in the inference loop now
+    # May depracate soon
+
+    output = np.delete(output, np.where(output == 434)) # <pad>
+    # Find <eos> and only consider output before it
+    eos_idx = np.where(output == 433)[0][0]             # <eos>
+    print('END OF SEQUENCE INDEX: {}'.format(eos_idx))
+    output = output[:eos_idx]
+    '''
 
     # Detect the properly formatted pairs of output, i.e. (time, note)
-    note_vals = list(range(32))
-    time_vals = list(range(32,432))
+    note_vals = list(range(32))     # Values of output array corresponding to notes
+    time_vals = list(range(32,432)) # Corresponding to times
+
     # Loop through the array two elements at a time
     pairs = []
     for i in range(output.shape[0]-1):
         pair = (output[i], output[i+1])
         if pair[0] in time_vals and pair[1] in note_vals:
-            pairs.append(pair)
+            pairs.append(pair)  # Append if pair follows (time, note) pattern
 
     # Create notes array
     notes_array = np.zeros(400)
     for pair in pairs:
-        notes_array[pair[0]-32] = pair[1]
+        notes_array[pair[0]-32] = pair[1]  # Recall, times are shifted forward by 32
     print(notes_array)
 
     return notes_array
@@ -164,6 +174,9 @@ def predict(model, device, input, sos_idx, max_len):
         # Get output
         output = model(input, prediction)
         pred = torch.tensor([torch.argmax(output[0,-1,:]).item()]).unsqueeze(0).to(device)
+        # Stop predicting once <eos> is output
+        if pred == 433:
+            break
         prediction = torch.cat((prediction, pred), dim=1)
         # print(torch.argmax(output[0,-1,:]).item())
 
