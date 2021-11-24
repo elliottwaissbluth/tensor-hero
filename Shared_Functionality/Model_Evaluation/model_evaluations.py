@@ -10,8 +10,6 @@ from model_metric_functions import *
 from mir_eval_function_onset_conversion import *
 
 
-
-
 def evaluate_model_run(model_run_path: str):
     model_run_metrics = {}
 

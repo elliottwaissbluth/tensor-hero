@@ -66,7 +66,7 @@ def create_notes_array(onsets, notes):
         notes = notes[:len(onsets)]
     
     notes_array = np.zeros(onsets[-1])
-    np.put(notes_array, onsets, notes)
+    np.put(notes_array, onsets[:-1], notes)
 
     return notes_array
     
@@ -155,19 +155,21 @@ def calc_note(idx, onset, curr_note, interval_length=100):
 
 
 def generate_song(song_path, 
-                  note_generation_function, 
+                  note_generation_function = generate_notes, 
                   onset_computation_function = onset_time,
                   generation_function_uses_song_as_input = False, 
                   source_separated_path = None, 
                   outfile_song_name = 'Model 4', 
-                  artist = 'Forrest'):
+                  artist = 'Forrest',
+                  outfolder = None,
+                  original_song_path = None):
     '''
     Takes the song present at song_path, uses onset_computation_function to compute onsets, uses note_generation_function
     to generate notes, then writes the song to an outfolder at ~/Model_3/Generated Songs/<outfile_song_name>
 
     ~~~~ ARGUMENTS ~~~~
     - song_path : Path or str
-        - path to the original song
+        - path to the original song, i.e. song.ogg
         - this will be used to create the folder ingested by Clone Hero
     - note_generation_function : function
         - takes onset indices as input, formatted as an array of onset times in 10ms time bins
@@ -188,21 +190,28 @@ def generate_song(song_path,
         - it also determines the song name that will appear in Clone Hero once the folder is transferred
     - artist : str
         - determines the artist written to the .chart file
+    - outfolder : Path
+        - Determines the folder where the generated song will be held
+    - original_song_path : Path
+        - if not none, will be used to save the original song rather than source separated song
+          to outfolder
     '''
     if source_separated_path is not None:
         path = source_separated_path
     else:
         path = song_path
-    
-    _, onset_times = onset_computation_function(path)
+
+    print('Computing onsets...')
+    _, onset_times = onset_computation_function(str(path))
     onset_indices = onset_time_bins(onset_times)
 
+    print('Generating Notes...\n')
     if generation_function_uses_song_as_input:
-        dense_notes = note_generation_function(onset_indices, path)
+        dense_notes = note_generation_function(onset_indices[:-1], path)
     else:
-        dense_notes = note_generation_function(onset_indices)
+        dense_notes = note_generation_function(onset_indices[:-1])
     
-    notes_array = create_notes_array(onset_indices, dense_notes)
+    notes_array = create_notes_array(onset_indices[:len(dense_notes)], dense_notes)
 
     song_metadata = {'Name' : outfile_song_name,
                     'Artist' : artist,
@@ -213,9 +222,13 @@ def generate_song(song_path,
                     'MediaType' : 'cd',
                     'MusicStream' : 'song.ogg'}
 
-    outfolder = Path(r'C:\Users\ewais\Documents\GitHub\tensor-hero\Model_3\Generated Songs\\'+ outfile_song_name)
+    # outfolder = Path(r'C:\Users\ewais\Documents\GitHub\tensor-hero\Model_3\Generated Songs\\'+ outfile_song_name)
     write_song_from_notes_array(song_metadata, notes_array, outfolder)
-    shutil.copyfile(str(song_path), str(outfolder / 'song.ogg'))
+    if original_song_path is not None:
+        shutil.copyfile(str(original_song_path), str(outfolder / 'song.ogg'))
+    else:
+        shutil.copyfile(str(path), str(outfolder / 'song.ogg'))
+    return notes_array
 
 # ---------------------------------------------------------------------------- #
 #                                  DEPRECATED                                  #
