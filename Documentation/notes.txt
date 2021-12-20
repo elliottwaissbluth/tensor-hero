@@ -1,5 +1,0 @@
-While running the CNN, getting a memory error after traversing
-all subroots. Maybe need to change some of
-DistributedFolderDataset functions.
-
-
