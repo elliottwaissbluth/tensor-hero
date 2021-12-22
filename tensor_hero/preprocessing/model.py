@@ -1,21 +1,20 @@
 from pathlib import Path 
-import sys
-# NOTE: You will have to change this to run it on your local machine
-sys.path.insert(1, r'/Users/ewaissbluth/Documents/GitHub/tensor-hero/Shared_Functionality/Data_Viz')    # NEEDSCHANGE
-sys.path.insert(1, r'/Users/ewaissbluth/Documents/GitHub/tensor-hero/Shared_Functionality/Preprocessing/Preprocessing Functions')   # NEEDSCHANGE
 import numpy as np
-from data_viz_functions import *
-from preprocess_functions import *
-import torch
 import os
 import pickle
 import math
 from tqdm import tqdm
+if __name__ == '__main__':
+    from preprocessing.data import *
+else:
+    from tensor_hero.preprocessing.data import *
 
-def notes_to_output_space(notes):
+def __notes_to_output_space(notes):
     '''
+    BUG: There may be a bug in this code, as the current system seems to output GRYBO in place of open notes files
+    
     Takes a notes array as input, and outputs a matrix of numpy arrays in the output format specified
-    by sequence to sequence piano transcription
+    by sequence to sequence piano transcription. This is 
 
     ~~~~ ARGUMENTS ~~~~
     - notes : numpy array
@@ -46,14 +45,14 @@ def notes_to_output_space(notes):
 
     return formatted
 
-def formatted_notes_to_indices(notes):
+def __formatted_notes_to_indices(notes):
     '''
     Takes formatted notes and returns a 1D array of indices, reverse one hot operation.
-    Helper function for prepare_notes_tensor()
+    Helper function for __prepare_notes_tensor()
 
     ~~~~ ARGUMENTS ~~~~
     notes : numpy array
-        - formatted notes, as output by notes_to_output_space()
+        - formatted notes, as output by __notes_to_output_space()
     
     ~~~~ RETURNS ~~~~
     indices : numpy array
@@ -65,18 +64,16 @@ def formatted_notes_to_indices(notes):
     indices = indices[:,-1].flatten()
     return indices
 
-def prepare_notes_tensor(notes):
+def __prepare_notes_tensor(notes):
     '''
     Takes formatted notes and converts them to the format suitable for PyTorch's transformer model.
     Helper function for populate_model_1_training_data()
 
     ~~~~ ARGUMENTS ~~~~
-    - notes : numpy array
-        - formatted notes, as output by notes_to_output_space()
+    - notes (2D numpy array): notes array processed by __notes_to_output_space()
 
     ~~~~ RETURNS ~~~~
-    - notes : numpy array
-        - format is [<sos>, time, note, time, note, etc..., <eos>]
+    - 1D numpy array: notes preprocessed for transformer model. Format is [<sos>, time, note, time, note, etc..., <eos>]
     '''
     # Concatenate two extra dimensions for SOS and EOS to self.notes
     notes_append = np.zeros(shape=(notes.shape[0], 2))
@@ -87,39 +84,37 @@ def prepare_notes_tensor(notes):
     # Add proper values to self.notes
     notes[0,-2] = 1  # <sos>
     notes[-1,-1] = 1 # <eos>
-    notes = formatted_notes_to_indices(notes)
+    notes = __formatted_notes_to_indices(notes)
     # Note: pytorch tensors don't compress as well as numpy arrays
     # notes = torch.tensor(notes, dtype=torch.float)
     return notes
 
-def process_spectrogram(spec):
+def __normalize_spectrogram(spec):
     '''
-    Removes padding from spectrogram and normalizes in [0,1]
-
+    Normalizes the spectrogram in [0,1]
+    
     ~~~~ ARGUMENTS ~~~~
-    - spec : numpy array
-        - padded spectrogram, loaded from spectrogram.npy in processed folder
+    - spec (2D numpy array): non-normalized spectrogram. Should be scaled in [-80, 0]
     
     ~~~~ RETURNS ~~~~
-    - spec : numpy array
-        - Normalized and 70ms padding removed from beginning and end of time dimension
+    - 2D numpy array: spec normalized in [0, 1]
     '''
-    spec = spec[:, 7:-7]    # Take off the padding
+    # spec = spec[:, 7:-7]    # Take off the padding # ?silence?
     spec = (spec+80) / 80   # Regularize
     return spec
 
 def populate_model_1_training_data(training_data_path, model_1_training_path, spec_file_name = 'spectrogram.npy', REPLACE=False):
     '''
-    Takes the spectrogram.npy files and the notes.npy files from the processed training data and
-    slices them into torch tensors representing 400ms of data. Creates train, val, and test
-    directories in model_1_training_path and populates them with numpy files of training data.
-    These can be leveraged by a dataloader during training
+    Takes the spectrogram.npy files and the notes.npy files from the processed training data and slices them into torch tensors 
+    representing 400ms of data. Creates train, val, and test directories in model_1_training_path and populates them with numpy 
+    files of training data. 
+    
+    TODO: The train-val-test is split at the 4s segment level, therefore each song probably has parts in each dataset. We should
+    change this to be at the song level.
 
     TO USE:
         - Within your training data folder, create a folder for this data, call it
         "Model 1 Training" for simplicity
-        - Change the paths in the __main__ script and in the sys.path.insert lines to match your local directory
-            - things that need changed are tagged with "NEEDSCHANGE"
         - Run this script
 
     NOTES:
@@ -134,11 +129,8 @@ def populate_model_1_training_data(training_data_path, model_1_training_path, sp
     - REPLACE : bool
         - If true, will replace the  files already present in the directory
 
-    ~~~~ RETURNS ~~~~
-    N/A
-
     ~~~~ SAVES ~~~~
-    - train_key.pkl : dict
+    - train_key.pkl, val_key.pkl, test_key.pkl (dict): details the origin of the training slices
         -  k,v = [index of saved pytorch file : information about where it came from]
         - "information" is another dictionary with
             - k,v = 'origin' : Path to origin, 'slice' : which 400ms section it came from
@@ -152,11 +144,6 @@ def populate_model_1_training_data(training_data_path, model_1_training_path, sp
     # Get paths of notes and corresponding paths of spectrograms
     spec_paths = [song / spec_file_name for song in processed_list]  # NOTE: Switch to different spectrogram
     notes_paths = [song / 'notes_simplified.npy' for song in processed_list]
-
-    def process_spectrogram(spec):  # NOTE: Change this for the new spectrogram computation function 
-        spec = spec[:, 7:-7]    # Take off the padding
-        spec = (spec+80) / 80   # Regularize
-        return spec
 
     # Used to create the outfile names of the saved slices
     # Will also be able to use these in conjunction with "train_key", "test_key", and "val_key"
@@ -221,7 +208,7 @@ def populate_model_1_training_data(training_data_path, model_1_training_path, sp
         except ValueError as err:
             print(err)
             continue
-        spec = process_spectrogram(spec)
+        spec = __normalize_spectrogram(spec)
 
         # Process notes
         try:
@@ -243,8 +230,8 @@ def populate_model_1_training_data(training_data_path, model_1_training_path, sp
         # This list will hold the pytorch note representations
         torch_notes = []
         for i in range(num_slices):
-            t_notes = notes_to_output_space(notes_bins[i,:])
-            t_notes = prepare_notes_tensor(t_notes)
+            t_notes = __notes_to_output_space(notes_bins[i,:])
+            t_notes = __prepare_notes_tensor(t_notes)
             torch_notes.append(t_notes)
         
         # Convert the spectrogram to pytorch tensor
@@ -268,11 +255,9 @@ def populate_model_1_training_data(training_data_path, model_1_training_path, sp
                 count = train_count
             
             # Save file
-            # NOTE: Converted to numpy files for space saving
+            # NOTE: Converted to numpy files for space saving, torch files were too big
             spec_outfile = prepend_path / 'spectrograms' / (str(count) + '.npy')
             notes_outfile = prepend_path / 'notes' / (str(count) + '.npy')
-            # torch.save(spec_to_save, spec_outfile)
-            # torch.save(torch_notes[idx], notes_outfile)
             np.save(spec_outfile, torch_spec[idx,...])
             np.save(notes_outfile, torch_notes[idx])
 
@@ -297,22 +282,11 @@ def populate_model_1_training_data(training_data_path, model_1_training_path, sp
     with open('test_key.pkl', 'wb') as f:
         pickle.dump(test_key, f)
     f.close()
-    return
 
-def preprocess(training_data_path):
-    '''
-    Run this function to preprocess the entire training data. Creates a folder in the main training data directory
-    called "Model 1 Training" and populates with processed data.
-
-    ~~~~ ARGUMENTS ~~~~
-    - training_data_path - path or string
-        - Path to main training data directory, .../Training Data
-    '''
-    model_1_training_path = training_data_path / 'Model 1 Training'
-    populate_model_1_training_data(training_data_path, model_1_training_path, REPLACE=True)
     return
 
 if __name__ == '__main__':
-    training_data_path = Path.cwd() / 'Training Data' / 'Training Data' # NEEDSCHANGE
+    sys.exit(0)
+    model_1_training_path = Path.cwd() / 'Training Data' / 'Training Data' / 'Model 1 Training'
     # print(training_data_path)
-    preprocess(training_data_path)
+    populate_model_1_training_data(model_1_training_path.parent, model_1_training_path)

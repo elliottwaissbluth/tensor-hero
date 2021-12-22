@@ -5,11 +5,11 @@ from tqdm import tqdm
 import numpy as np
 if __name__ == '__main__':
     from chart import chart2tensor
-    from audio import music2tensor, compute_mel_spectrogram
+    from audio import compute_mel_spectrogram
     from resources.resources import simplified_note_dict
 else:
     from tensor_hero.preprocessing.chart import chart2tensor
-    from tensor_hero.preprocessing.audio import music2tensor, compute_mel_spectrogram
+    from tensor_hero.preprocessing.audio import compute_mel_spectrogram
     from tensor_hero.preprocessing.resources.resources import simplified_note_dict
 __release_keys = list(np.arange(187, 218))
 __release_keys.append(224)
@@ -169,7 +169,7 @@ def populate_processed_folder(unprocessed_data_path, processed_data_path, REPLAC
             print('{} audio has already been processed'.format(str(Path(processed_path)).split('\\')[-1]))
             song = np.load(processed_song_path)
         else:
-            song = music2tensor(unprocessed_song_path)
+            song = compute_mel_spectrogram(unprocessed_song_path)
             np.save(processed_song_path, song)
         
         # Check if notes have already been processed
@@ -306,12 +306,19 @@ def __remove_modifiers(notes_array):
     return new_notes
 
 def populate_with_simplified_notes(processed_directory):
-    '''Takes all the processed notes.npy files in processed_directory (probably ./Training Data/Processed) and
-       adds simplified versions (notes_simplified.npy) to the same subdirectories'''
+    '''
+    Takes all the processed notes arrays (notes.npy) in processed_directory and adds simplified versions 
+    (notes_simplified.npy) to the same subdirectories.
+    
+    Simplified notes are free from modifiers and held notes.
+    
+    ~~~~ ARGUMENTS ~~~~
+    - processed_directory (Path): Path to processed training data directory (probably ./Training Data/Processed)
+    '''
     
     # Parse through directory
     for x in tqdm(os.listdir(processed_directory)):
-        # Check to see if the .DS_Store file is mysteriously in the directory, skip if so
+        # Check to see if the .DS_Store file is in the directory, skip if so
         if '.DS_Store' in x:
             continue
         for y in os.listdir(processed_directory / x):

@@ -1,27 +1,22 @@
 import torch
 from torch import nn
-import torch.optim as optim
 import numpy as np
-from pathlib import Path
 import os
-import matplotlib.pyplot as plt
 
 class LazierDataset(torch.utils.data.Dataset):
     '''
-    Inspects the data at partition_path, creates a list (data_paths) and a dictionary (labels)
-        - data_paths : list
-            [<path to spectrogram frame> for _  in partition_path]
-        - labels : dictionary
-            - [<path to spectrogram frame> : <path to corresponding notes>]
-    Loads each training example one at a time, as called by the dataloader
+    Inspects the data at partition_path, creates a list (data_paths) and a dictionary (labels) where the list contains
+    paths to spectrogram slices (400ms) and the dictionarty contains path to spectrogram frames and corresponding notes
+    arrays.
+        - data_paths (list of Path): [<path to spectrogram frame> for _  in partition_path]
+        - labels (dict) : [<path to spectrogram frame> : <path to corresponding notes>]
+
+    Lazy loads data, i.e. loads each training example one at a time, as the dataloader is called.
 
     ~~~~ ARGUMENTS ~~~~
-    - partition_path : path or str
-        - should be .../Training Data/Model 1 Training/<train, test, or val>
-    - max_len : int
-        - for padding, what the length of the notes arrays should be
-    - pad_idx : int
-        - value the notes tensors will be padded with
+    - partition_path (Path): should be .../Training Data/Model 1 Training/<train, test, or val>
+    - max_len (int): used for padding, indicates what the length of the notes arrays should be
+    - pad_idx (int): pad index, value the notes tensors will be padded with
     '''
     def __init__(self, partition_path, max_src_len, max_trg_len, pad_idx):
         # Construct list of spectrogram paths
@@ -89,9 +84,6 @@ class InputEmbedding(nn.Module):
     This is a custom class which can be used in place of nn.Embedding for input embeddings.
     We can't use nn.Embedding for our input because our input is continuous, and nn.Embedding
     only works with discrete vocabularies such as words.
-
-    When initializing the transformer, we define a nn.ModuleList (i.e. list of modules) containing
-    400 of these layers. Each spectrogram frame goes through each one of these.
     '''
     def __init__(
         self,
@@ -102,7 +94,7 @@ class InputEmbedding(nn.Module):
         # Take the spectrogram frames and pass them through a FC layer
         self.linear = nn.Sequential(
             nn.Linear(embedding_size, embedding_size),
-            nn.ReLU(),
+            nn.Sigmoid(),
         )
     
     def forward(self, src):
@@ -123,25 +115,16 @@ class Transformer(nn.Module):
     ):
         super(Transformer, self).__init__()
 
-        # src_position_embedding and trg_position_embedding work the same, we can use nn.Embedding
-        # for both
+        # src_position_embedding and trg_position_embedding work the same, we can use nn.Embedding for both
         self.src_position_embedding = nn.Embedding(max_len, embedding_size)
         self.trg_position_embedding = nn.Embedding(max_len, embedding_size)
 
         # trg_word_embeddings can also leverage nn.Embedding, since the target values come from a
-        # discrete vocabulary (unlike the continuous spectrogram input)
+        # discrete vocabulary of note events (unlike the continuous spectrogram input)
         self.trg_word_embedding = nn.Embedding(trg_vocab_size, embedding_size)
 
-        # The word embeddings need to come from a series of parallel linear layers, as defined in
-        # this module list
-
-        # inputs of dim 512, so we can't feed nn.Embedding an index
-        # self.src_word_embedding = nn.ModuleList(
-            # [
-            # InputEmbedding(embedding_size) for _ in range(max_len)
-            # ]
-        # )
-        self.src_word_embedding = InputEmbedding(embedding_size)
+        # continuous inputs of dim 512, so we can't feed nn.Embedding an index
+        self.src_spec_embedding = InputEmbedding(embedding_size)
 
         self.device = device    # device will be used to move tensors from CPU to GPU 
         self.transformer = nn.Transformer(  # Define transformer
@@ -157,14 +140,9 @@ class Transformer(nn.Module):
         self.fc_out = nn.Linear(embedding_size, trg_vocab_size)     # Output linear layer
         self.dropout = nn.Dropout(dropout)      # Dropout to avoid overfitting
 
-        
-     
-
     def make_src_mask(self, src):
         '''
-        This src_mask can remain this hardcoded array of "False" values so long as we are only
-        showing the transformer whole chunks of 4 second data. If we change this, we will need to
-        create source masks that mask the padding on the input spectrogram.
+        Creates a boolean array of shape [batch size, max_len] 
         '''
         # Create tensor of all "False" values for single input
         src_mask = torch.zeros(src.shape[0], 400, dtype=torch.bool)
@@ -184,7 +162,6 @@ class Transformer(nn.Module):
         '''
         # out = torch.zeros_like(src, requires_grad=True).to(self.device)
         out_list = []
-        print('src shape : {}'.format(src.shape))
 
         # out is shape [1,512,400], just like the src.
         # "out" means the embedding of the input
@@ -192,11 +169,11 @@ class Transformer(nn.Module):
         # translating 400 slices of spectrogram data to 400 slices of embeddings
         for idx in range(src.shape[2]): # For each spectrogram frame
             if idx < 400:
-                out_list.append(self.src_word_embedding(src[...,idx]).unsqueeze(-1))
+                out_list.append(self.src_spec_embedding(src[...,idx]).unsqueeze(-1))
             else:
                 out_list.append(torch.zeros_like(out_list[0]))
-        print(out_list[0].shape)
         return out_list
+        
 
 
     def forward(self, src, trg):
@@ -227,19 +204,17 @@ class Transformer(nn.Module):
         # trg without padding = [433, 70, 0, 300, 3, 434], Len = 5
         # trg with padding = [433, 70, 0, 300, 3, 434, 435, 435, 435, 435, ..., 435] Len = max_trg_seq_len
 
-
         # The permutations are just to get the embeddings into the right shape for the encoder
         # Notice how make_embed_src() is called, this is our custom function that passes the input through the parallel dense layers
         out_list = self.make_embed_src(src)
         src_embed = torch.cat(out_list, dim=2)
-        print('src_embed shape: {}'.format(src_embed.shape))
 
         embed_src = self.dropout(
             (src_embed + self.src_position_embedding(src_positions).permute(1,2,0))
             .to(self.device)
         ).permute(0,2,1)
         # This is going into the transformer (final input after the pink blocks)
-
+        
         # embed_trg uses "word" embeddings since trg is just a list of indices corresponding to "words" i.e. note events.
         # Positional embeddings are summed at this stage.
         embed_trg = self.dropout(

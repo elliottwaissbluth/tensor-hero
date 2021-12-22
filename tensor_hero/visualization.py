@@ -19,15 +19,7 @@ note_idx_to_c = { # Colors of notes
     5 : '#ff9100'
 }
 
-def slice_notes(notes, start=0, end=2):
-    '''
-    Takes a notes array and slices it between start and end in seconds
-    '''
-    assert start < end, "Error: start value must be less than end value"
-    start_tick, end_tick = start*100, end*100  # ticks are in 10ms bins
-    return notes[start_tick:end_tick]
-
-def create_scatter_axes(notes, ax=None):
+def __create_scatter_axes(notes, ax=None):
     '''
     Helper function for plot_chart()
 
@@ -81,6 +73,22 @@ def create_scatter_axes(notes, ax=None):
 
     return ax
 
+def slice_notes(notes, start=0, end=2):
+    '''
+    Takes a notes array and slices it between start and end in seconds
+    
+    ~~~~ ARGUMENTS ~~~~
+    - notes (1D numpy array): notes array
+    - start (int): start of slice relative to beginning of song in seconds
+    - end (int): end of slice relative to beginning of song in seconds
+   
+   ~~~~ RETURNS ~~~~
+   1D numpy array: notes array sliced between start and end
+    '''
+    assert start < end, "Error: start value must be less than end value"
+    start_tick, end_tick = start*100, end*100  # ticks are in 10ms bins
+    return notes[start_tick:end_tick]
+
 def plot_chart(ground_truth=None, candidate=None, audio=None, SHOW=True):
     '''
     Plots Guitar Hero charts and spectrograms using matplotlib.
@@ -103,13 +111,13 @@ def plot_chart(ground_truth=None, candidate=None, audio=None, SHOW=True):
 
     # ground truth plot
     if ground_truth is not None:
-        create_scatter_axes(ground_truth, axes[ax_idx])
+        __create_scatter_axes(ground_truth, axes[ax_idx])
         axes[ax_idx].set_title('Ground Truth')
         ax_idx += 1
 
     # candidate plot
     if candidate is not None:
-        create_scatter_axes(candidate, axes[ax_idx])
+        __create_scatter_axes(candidate, axes[ax_idx])
         axes[ax_idx].set_title('Candidate')
         ax_idx += 1
 

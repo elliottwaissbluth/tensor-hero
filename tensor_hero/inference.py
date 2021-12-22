@@ -7,17 +7,13 @@
     # 3) Change some of the filepaths related to saving song output
     # 4) Run the file
 
-import sys
-sys.path.insert(1, r'C:\Users\ewais\Documents\GitHub\tensor-hero\Model_1')
-sys.path.insert(1,r'C:\Users\ewais\Documents\GitHub\tensor-hero\Shared_Functionality\Preprocessing\Preprocessing Functions')
 import torch
 import numpy as np
-from model import *
-from audio_functions import *
 from tqdm import tqdm
 import os
 import shutil
-from librosa.display import specshow
+from tensor_hero.preprocessing.audio import compute_mel_spectrogram
+from tensor_hero.model import Transformer
 
 # Convert notes array to strings representing note events
 # This is useful for writing .chart files from notes arrays
