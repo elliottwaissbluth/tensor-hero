@@ -1,11 +1,4 @@
 from pathlib import Path 
-<<<<<<< HEAD:tensor_hero/preprocessing/model.py
-=======
-import sys
-# NOTE: You will have to change this to run it on your local machine
-sys.path.insert(1, r'C:\Users\ewais\Documents\GitHub\tensor-hero\Shared_Functionality\Data_Viz')    # NEEDSCHANGE
-sys.path.insert(1, r'C:\Users\ewais\Documents\GitHub\tensor-hero\Shared_Functionality\Preprocessing\Preprocessing Functions')   # NEEDSCHANGE
->>>>>>> main:Model_1/Processing/m1_preprocessing.py
 import numpy as np
 import os
 import pickle
