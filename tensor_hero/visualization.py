@@ -21,7 +21,7 @@ note_idx_to_c = { # Colors of notes
 
 def __create_scatter_axes(notes, ax=None):
     '''
-    Helper function for plot_chart()
+    Helper function for plot_chart(), creates a matplotlib axis from a notes array.
 
     ~~~ ARGUMENTS ~~~~
     - notes (list of int): notes arrays. The longer the notes array, the wider the plot.

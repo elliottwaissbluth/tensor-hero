@@ -1,4 +1,11 @@
 from pathlib import Path 
+<<<<<<< HEAD:tensor_hero/preprocessing/model.py
+=======
+import sys
+# NOTE: You will have to change this to run it on your local machine
+sys.path.insert(1, r'C:\Users\ewais\Documents\GitHub\tensor-hero\Shared_Functionality\Data_Viz')    # NEEDSCHANGE
+sys.path.insert(1, r'C:\Users\ewais\Documents\GitHub\tensor-hero\Shared_Functionality\Preprocessing\Preprocessing Functions')   # NEEDSCHANGE
+>>>>>>> main:Model_1/Processing/m1_preprocessing.py
 import numpy as np
 import os
 import pickle
@@ -139,8 +146,9 @@ def populate_model_1_training_data(training_data_path, model_1_training_path, sp
 
     # Get list of processed song paths
     unprocessed_path = training_data_path / 'Unprocessed'
-    _, processed_list = get_list_of_ogg_files(unprocessed_path)
-
+    _, processed_list = get_list_of_ogg_files(unprocessed_path, stem='separated')
+    print('Processing {} songs...'.format(len(processed_list)))
+    
     # Get paths of notes and corresponding paths of spectrograms
     spec_paths = [song / spec_file_name for song in processed_list]  # NOTE: Switch to different spectrogram
     notes_paths = [song / 'notes_simplified.npy' for song in processed_list]
@@ -197,6 +205,7 @@ def populate_model_1_training_data(training_data_path, model_1_training_path, sp
     test_key = {}
     val_key = {}
 
+    print('Processing Data...')
     for i in tqdm(range(len(notes_paths))):
         # NOTE: if spectrogram computation changes, this needs to change as well
         # Process spectrogram
@@ -218,6 +227,9 @@ def populate_model_1_training_data(training_data_path, model_1_training_path, sp
             continue
         notes = notes[7:-7]  # Eliminate padding
 
+        if notes.shape[0] != spec.shape[1]:  # The spectrograms from the source separated files were slightly mismatched
+            spec = spec[:,:notes.shape[0]]   # I don't expect this to break anything
+        
         assert notes.shape[0] == spec.shape[1], 'ERROR: Spectrogram and notes shape do not match'
         
         # Get number of 4 second slices

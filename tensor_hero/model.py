@@ -64,7 +64,9 @@ class LazierDataset(torch.utils.data.Dataset):
 
 class RandomInputDataset(LazierDataset):
     '''
-    Loads random spectrograms as input but actual notes
+    Loads random spectrograms as input but actual notes as output
+
+    Designed to test a baseline for what the model learns given meaningless input
     '''
     def __init__(self, partition_path, max_src_len, max_trg_len, pad_idx):
         super().__init__(partition_path, max_src_len, max_trg_len, pad_idx)
