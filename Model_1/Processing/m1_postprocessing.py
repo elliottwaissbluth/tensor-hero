@@ -325,6 +325,6 @@ if __name__ == '__main__':
                  'MediaType' : 'cd',
                  'MusicStream' : 'song.ogg'}
 
-    model.load_state_dict(torch.load(r'C:\Users\ewais\Documents\GitHub\tensor-hero\Model_1\saved models\model10\model10.pt'))
+    model.load_state_dict(torch.load(r'C:\Users\ewais\Documents\GitHub\tensor-hero\Model_1\saved models\model11\model11.pt'))
 
     _ = full_song_prediction(song_path, model, device, 432, 500, song_metadata, outfolder)

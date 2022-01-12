@@ -152,6 +152,50 @@ def calc_note(idx, onset, curr_note, interval_length=100):
         curr_note = random.randint(6,31)
     return curr_note
 
+def generate_centroid_notes(onset, centroid, interval_length=100):
+    '''[summary]
+
+    Args:
+        onset ([type]): [description]
+        centroid ([type]): [description]
+        interval_length (int, optional): [description]. Defaults to 100.
+
+    Returns:
+        [type]: [description]
+    '''
+    # Notes: 1-5 are single notes
+    # 6 - 31 are chords
+    # 32 is open note
+    # conditions:
+    # check onset and onset + 1
+    # if < 2 then it should be single note
+    
+    # centroid format is 10ms bins, each index corresponds to 10ms of time
+    
+    curr_note = 0
+    note_array = []
+    # need to generate first note
+    if onset[1] - onset[0] < interval_length:
+        curr_note = random.randint(1,5)
+        note_array.append(curr_note)
+    else:
+        curr_note = random.randint(6,31)
+        note_array.append(curr_note)    
+    
+    
+    for i in range(1,len(onset)-1): # since we'll be forward looking by one
+        curr_note = calc_note(i,onset, curr_note)
+        note_array.append(curr_note)
+
+    # Looks at last note and compares will repeat 
+    if (note_array[-1] < 6) :
+        curr_note = random.randint(1,5)
+        note_array.append(curr_note)
+    else:
+        curr_note = random.randint(6,31)
+        note_array.append(curr_note)
+   
+    return note_array
 
 
 def generate_song(song_path, 

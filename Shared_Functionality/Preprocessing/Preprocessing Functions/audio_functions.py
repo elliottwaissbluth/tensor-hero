@@ -97,7 +97,10 @@ def compute_mel_spectrogram(song_path):
         -   70ms of silence appended to beginning and end of spectrogram
     '''
     data, sr = librosa.load(str(song_path))
-    resampled = librosa.resample(data, sr, 44100)
+    if sr != 44100:
+        resampled = librosa.resample(data, sr, 44100)
+    else:
+        resampled = data
     spec = librosa.feature.melspectrogram(resampled, 44100, n_fft=2048*2, hop_length=441, n_mels=512, power=2, fmax = sr/2)
     spec = librosa.power_to_db(spec, ref=np.max)
     return spec

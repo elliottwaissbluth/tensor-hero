@@ -1,8 +1,8 @@
 from pathlib import Path 
 import sys
 # NOTE: You will have to change this to run it on your local machine
-sys.path.insert(1, r'/Users/ewaissbluth/Documents/GitHub/tensor-hero/Shared_Functionality/Data_Viz')    # NEEDSCHANGE
-sys.path.insert(1, r'/Users/ewaissbluth/Documents/GitHub/tensor-hero/Shared_Functionality/Preprocessing/Preprocessing Functions')   # NEEDSCHANGE
+sys.path.insert(1, r'C:\Users\ewais\Documents\GitHub\tensor-hero\Shared_Functionality\Data_Viz')    # NEEDSCHANGE
+sys.path.insert(1, r'C:\Users\ewais\Documents\GitHub\tensor-hero\Shared_Functionality\Preprocessing\Preprocessing Functions')   # NEEDSCHANGE
 import numpy as np
 from data_viz_functions import *
 from preprocess_functions import *
@@ -147,8 +147,9 @@ def populate_model_1_training_data(training_data_path, model_1_training_path, sp
 
     # Get list of processed song paths
     unprocessed_path = training_data_path / 'Unprocessed'
-    _, processed_list = get_list_of_ogg_files(unprocessed_path)
-
+    _, processed_list = get_list_of_ogg_files(unprocessed_path, stem='separated')
+    print('Processing {} songs...'.format(len(processed_list)))
+    
     # Get paths of notes and corresponding paths of spectrograms
     spec_paths = [song / spec_file_name for song in processed_list]  # NOTE: Switch to different spectrogram
     notes_paths = [song / 'notes_simplified.npy' for song in processed_list]
@@ -210,6 +211,7 @@ def populate_model_1_training_data(training_data_path, model_1_training_path, sp
     test_key = {}
     val_key = {}
 
+    print('Processing Data...')
     for i in tqdm(range(len(notes_paths))):
         # NOTE: if spectrogram computation changes, this needs to change as well
         # Process spectrogram
@@ -222,7 +224,6 @@ def populate_model_1_training_data(training_data_path, model_1_training_path, sp
             print(err)
             continue
         spec = process_spectrogram(spec)
-
         # Process notes
         try:
             notes = np.load(notes_paths[i])
@@ -231,6 +232,9 @@ def populate_model_1_training_data(training_data_path, model_1_training_path, sp
             continue
         notes = notes[7:-7]  # Eliminate padding
 
+        if notes.shape[0] != spec.shape[1]:  # The spectrograms from the source separated files were slightly mismatched
+            spec = spec[:,:notes.shape[0]]   # I don't expect this to break anything
+        
         assert notes.shape[0] == spec.shape[1], 'ERROR: Spectrogram and notes shape do not match'
         
         # Get number of 4 second slices
@@ -273,6 +277,12 @@ def populate_model_1_training_data(training_data_path, model_1_training_path, sp
             notes_outfile = prepend_path / 'notes' / (str(count) + '.npy')
             # torch.save(spec_to_save, spec_outfile)
             # torch.save(torch_notes[idx], notes_outfile)
+            
+            # print(torch_spec.shape)
+            # print(torch_notes[idx].shape)
+            # print(torch_notes[idx])
+            # print(spec_outfile)
+            # print(notes_outfile)
             np.save(spec_outfile, torch_spec[idx,...])
             np.save(notes_outfile, torch_notes[idx])
 
@@ -308,11 +318,11 @@ def preprocess(training_data_path):
     - training_data_path - path or string
         - Path to main training data directory, .../Training Data
     '''
-    model_1_training_path = training_data_path / 'Model 1 Training'
-    populate_model_1_training_data(training_data_path, model_1_training_path, REPLACE=True)
+    model_1_training_path = training_data_path / 'Model 1 Training Separated'
+    populate_model_1_training_data(training_data_path, model_1_training_path, spec_file_name='spectrogram_separated.npy', REPLACE=False)
     return
 
 if __name__ == '__main__':
-    training_data_path = Path.cwd() / 'Training Data' / 'Training Data' # NEEDSCHANGE
+    training_data_path = Path(r'X:\Training Data')
     # print(training_data_path)
     preprocess(training_data_path)

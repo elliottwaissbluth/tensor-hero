@@ -11,13 +11,15 @@ from audio_functions import *
 from tqdm import tqdm
 import numpy as np
 
-def check_multiple_audio_files(fileList):
+def check_multiple_audio_files(fileList, expected_file_name='separated.ogg'):
     '''Checks if there are separate audio files for single song'''
 
     # Get audio file list
     num_files = 0
     multiple_files = False
     for track in fileList:
+        if track == expected_file_name:
+            continue
         if track.endswith('.ogg'):
             num_files += 1
         if track.endswith('.mp3'):
@@ -148,7 +150,7 @@ def populate_processed_folder(unprocessed_data_path, processed_data_path, replac
     
     return data_info
 
-def get_list_of_ogg_files(unprocessed_path):
+def get_list_of_ogg_files(unprocessed_path, stem='song'):
     '''
     Takes the root directory (unprocessed_path) and returns a list of the full file paths
     to all the .ogg files in that directory, provided there is only one per folder (i.e. it
@@ -165,6 +167,7 @@ def get_list_of_ogg_files(unprocessed_path):
     '''
     ogg_file_paths = []
     processed_paths = []
+    num_multiple_audio = 0
     for track_pack in [unprocessed_path / x for x in os.listdir(unprocessed_path)]:
         # Ignore DS_Store if running on mac
         if 'DS_Store' in str(track_pack):
@@ -173,29 +176,19 @@ def get_list_of_ogg_files(unprocessed_path):
             if 'DS_Store' in str(song_dir):
                 continue
             if check_multiple_audio_files(os.listdir(song_dir)):
+                num_multiple_audio += 1
                 continue
             else:
                 for f in os.listdir(song_dir):
-                    if f.endswith('.ogg'):
+                    if str(f) == stem + '.ogg':
                         ogg_file_paths.append(song_dir / f)
                         processed_paths.append(Path(str(song_dir).replace('Unprocessed', 'Processed', 1)))
-                        
+    
+    print(f'{num_multiple_audio} songs were skipped due to multiple audio files')
     return ogg_file_paths, processed_paths
 
-# def source_seperate_ogg(ogg_list: list):
-    # separator = Separator('spleeter:4stems')
-    # audio_loader = AudioAdapter.default()
-    # sample_rate = 22050
-    # range_ = 32767
 
-    # for ogg in ogg_list:
-        # waveform, _ = audio_loader.load(ogg, sample_rate=sample_rate)
-        # prediction = separator.separate(waveform)
-        # prediction['other'] = prediction['other']*range_
-        # write()
-
-
-def populate_processed_folder_with_spectrograms(unprocessed_path, REPLACE=True):
+def populate_processed_folder_with_spectrograms(unprocessed_path, REPLACE=True, stem='song', outfile_stem='spectrogram'):
     '''
     Takes all the .ogg files in unprocessed_path (besides source separated files), computes their spectrogram,
     then saves that spectrogram to the processed_path analog. If REPLACE = True, the function will replace
@@ -205,11 +198,13 @@ def populate_processed_folder_with_spectrograms(unprocessed_path, REPLACE=True):
 
     ~~~~ INPUTS ~~~~
     -   unprocessed_path : path to root unprocessed folder (probably ./Training Data/Unprocessed)
+    -   REPLACE (bool): if True, will replace the current spectrograms with newly computed spectrograms
+    -   stem (str): refers to "song" in "song.ogg," or "separated" in "separated.ogg", chooses which audio file to compute spectrogram from.
+    -   outfile_stem (str): the stem of the saved spectrogram file in each Processed folder (i.e. spectrogram.npy)
     '''
-    ogg_file_paths, processed_paths = get_list_of_ogg_files(unprocessed_path)
+    ogg_file_paths, processed_paths = get_list_of_ogg_files(unprocessed_path, stem=stem)
     APPEND_ARR_CREATED = False
     for i in tqdm(range(len(ogg_file_paths))):
-
         if not os.path.exists(processed_paths[i]): # if the processed folder doesn't exist
             continue
         if not REPLACE:     # if processed folder has already been populated
@@ -226,11 +221,10 @@ def populate_processed_folder_with_spectrograms(unprocessed_path, REPLACE=True):
         spec = np.c_[append_arr, spec, append_arr]
 
         # Save to appropriate processed folder
-        np.save(str(processed_paths[i] / 'spectrogram.npy'), spec)  # NOTE: Change to something like 'source_separated_spec.npy'
-
+        np.save(str(processed_paths[i] / (outfile_stem + '.npy')), spec)  # NOTE: Change to something like 'source_separated_spec.npy'
     return
 
 
 if __name__ == '__main__':
-    unprocessed_path = Path(r'/Users/ewaissbluth/Documents/GitHub/tensor-hero/Training Data/Training Data/Unprocessed')
-    populate_processed_folder_with_spectrograms(unprocessed_path)
+    unprocessed_path = Path(r'X:\Training Data\Unprocessed')
+    populate_processed_folder_with_spectrograms(unprocessed_path, stem="separated", outfile_stem='spectrogram_separated')  # For newly source separated data

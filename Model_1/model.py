@@ -5,6 +5,19 @@ import numpy as np
 from pathlib import Path
 import os
 
+def check_notes_length(notes_path, max_len):
+    '''Opens the processed notes array at notes_path and checks whether or not it is larger than max_len
+
+    Args:
+        notes_path (Path): path to notes array
+        max_len (int): maximum length of notes
+        
+    Returns:
+        bool: Whether the notes array at notes_path is >= max_len
+    '''
+    notes_array = np.load(notes_path)
+    return notes_array.shape[0] < max_len
+
 class LazierDataset(torch.utils.data.Dataset):
     '''
     Inspects the data at partition_path, creates a list (data_paths) and a dictionary (labels)
@@ -24,13 +37,26 @@ class LazierDataset(torch.utils.data.Dataset):
     '''
     def __init__(self, partition_path, max_src_len, max_trg_len, pad_idx):
         # Construct list of spectrogram paths
-        self.data_paths = [partition_path / 'spectrograms' / x for x in os.listdir(partition_path / 'spectrograms')]
+        dp = [partition_path / 'spectrograms' / x for x in os.listdir(partition_path / 'spectrograms')]
         
         # Construct dictionary
+        l = {}  # labels
+        for data_path in dp:
+            l[data_path] = data_path.parent.parent / 'notes' / (data_path.stem + '.npy')
+            
+        # Weed out bits of data that exceed the maximum length
         self.labels = {}
-        for data_path in self.data_paths:
-            self.labels[data_path] = data_path.parent.parent / 'notes' / (data_path.stem + '.npy')
-
+        self.data_paths = []
+        self.too_long = []
+        for x in dp:
+            if check_notes_length(l[x], max_trg_len):
+                self.data_paths.append(x)
+                self.labels[x] = l[x]
+            else:
+                self.too_long.append(x)
+        
+        print(f'{len(self.too_long)} datapoints removed due to exceeding maximum length')
+        
         self.max_trg_len = max_trg_len
         self.max_src_len = max_src_len
         self.pad_idx = pad_idx
@@ -61,7 +87,7 @@ class LazierDataset(torch.utils.data.Dataset):
         spec = np.load(self.data_paths[idx])
         spec = self.pad_spec(spec)
         notes = np.load(self.labels[self.data_paths[idx]])
-        assert notes.shape[0] < self.max_trg_len, 'ERROR: notes array is longer than max_len'
+        assert notes.shape[0] < self.max_trg_len, 'ERROR: notes array is longer than max_trg_len, (notes length = {}), (max_len = {})'.format(notes.shape[0], self.max_trg_len)
         notes = self.pad_notes(notes)
 
         return torch.tensor(spec, dtype=torch.float), torch.tensor(notes)
