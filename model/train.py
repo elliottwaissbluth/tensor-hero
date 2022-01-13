@@ -55,8 +55,6 @@ def main():
         # ---------------------------------------------------------------------------- #
 
         # create folder for model, this code prevents unwanted overwrites
-        # This whole override thing is useful when you try to run an experiment but run into a bug
-        # and have to restart the program
         LOAD = False
         response = str(input('Load from pretrained model? (y/n): ')).lower()
         while response not in ['y', 'n']:
@@ -125,7 +123,6 @@ def main():
         # ---------------------------------------------------------------------------- #
         #                               MODEL PARAMETERS                               #
         # ---------------------------------------------------------------------------- #
-
         
         max_trg_len = params['max_trg_len'] # length of all target note sequences, holds 99 notes max
         max_src_len = params['max_src_len']

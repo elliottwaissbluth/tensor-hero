@@ -9,6 +9,10 @@ if __name__ == '__main__':
 else:
     from tensor_hero.preprocessing.data import *
 
+'''
+This script was formerly implemented as m1_preprocessing.py
+'''
+
 def __notes_to_output_space(notes):
     '''
     BUG: There may be a bug in this code, as the current system seems to output GRYBO in place of open notes files

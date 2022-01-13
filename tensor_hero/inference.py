@@ -1,12 +1,3 @@
-# WARNING
-# Some things in the functions are hardcoded. This is a rough outline so be wary of using these functions
-
-# General heuristic for use:
-    # 1) Train model
-    # 2) Define model with same parameters in __main__
-    # 3) Change some of the filepaths related to saving song output
-    # 4) Run the file
-
 import torch
 import numpy as np
 from tqdm import tqdm
@@ -14,6 +5,20 @@ import os
 import shutil
 from tensor_hero.preprocessing.audio import compute_mel_spectrogram
 from tensor_hero.model import Transformer
+from pathlib import Path
+
+'''
+This script was previously implemented as m1_postprocessing.py
+
+# WARNING
+# Some things in the functions are hardcoded. This is a rough outline so be wary of using these functions
+
+# General heuristic for use:
+    # 1) Train model
+    # 2) Define model with same parameters in __main__
+    # 3) Change some of the filepaths related to saving song output
+    # 4) Run the file 
+'''
 
 # Convert notes array to strings representing note events
 # This is useful for writing .chart files from notes arrays
@@ -27,7 +32,7 @@ notes_to_chart_strings = {
     7 : ['0','2'],
     8 : ['0','3'],
     9 : ['0','4'],
-    10 : ['1','2'],
+    10 : ['1','2'], 
     11 : ['1','3'],
     12 : ['1','4'],
     13 : ['2','3'],
