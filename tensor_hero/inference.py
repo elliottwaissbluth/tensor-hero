@@ -10,7 +10,7 @@ from pathlib import Path
 '''
 This script was previously implemented as m1_postprocessing.py
 
-# WARNING
+# NOTE
 # Some things in the functions are hardcoded. This is a rough outline so be wary of using these functions
 
 # General heuristic for use:

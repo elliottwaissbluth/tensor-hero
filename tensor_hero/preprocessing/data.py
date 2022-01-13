@@ -274,7 +274,9 @@ def populate_processed_folder_with_spectrograms(unprocessed_path, spectrogram_na
 
     return
 
-# ~~~~ NOTES SIMPLIFICATION ~~~~ #
+# ---------------------------------------------------------------------------- #
+#                              NOTES SIMPLIFICATION                            #
+# ---------------------------------------------------------------------------- #
 
 def __remove_release_keys(notes_array):
     '''

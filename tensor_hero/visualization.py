@@ -92,6 +92,9 @@ def slice_notes(notes, start=0, end=2):
 def plot_chart(ground_truth=None, candidate=None, audio=None, SHOW=True):
     '''
     Plots Guitar Hero charts and spectrograms using matplotlib.
+    
+    Can also be used to plot spectrograms without notes, just fill in the audio arg without
+    ground_truth or candidate.
 
     ~~~~ ARGUMENTS ~~~~
     - ground_truth (list of int): ground truth notes array
@@ -100,14 +103,20 @@ def plot_chart(ground_truth=None, candidate=None, audio=None, SHOW=True):
     - SHOW (bool): If true, will show the generated plot in place
 
     ~~~~ RETURNS ~~~~
-    - fig (matplotlib figure): contains the full generated plot
+    - matplotlib figure: contains the full generated plot
     '''
     num_subplots = int(ground_truth is not None) + int(candidate is not None) + int(audio is not None)
     assert num_subplots > 0, 'ERROR, plot_chart was called without input'
     
     fig, axes = plt.subplots(num_subplots)
-    fig.set_size_inches(min(len(ground_truth)/40, 900), 2*num_subplots)
+    if ground_truth is not None:
+        fig.set_size_inches(min(len(ground_truth)/40, 900), 2*num_subplots)
+    elif candidate is not None:
+        fig.set_size_inches(min(len(candidate)/40, 900), 2*num_subplots)
     ax_idx = 0
+
+    if num_subplots == 1:
+        axes = [axes]
 
     # ground truth plot
     if ground_truth is not None:
@@ -130,20 +139,3 @@ def plot_chart(ground_truth=None, candidate=None, audio=None, SHOW=True):
         plt.show()
 
     return fig
-
-if __name__ == '__main__':
-    '''
-    Run this script for a demo
-    '''
-    notes_path = str(Path.cwd() / 'Prototyping' / 'visualization' / 'notes.npy')
-    notes = np.load(notes_path)
-    # Put path to some spectrogram here
-    # audio = np.load(str(Path.cwd() / 'Shared_Functionality' / 'Data Viz' / 'Prototyping' / 'audio.npy'))
-
-    start = 60
-    end = 70
-
-    sliced_notes = slice_notes(notes, start=start, end=end)
-
-    plot_chart(sliced_notes, sliced_notes) # Add audio[:, start*100:end*100] to see spectrogram
-    

@@ -4,10 +4,7 @@ import os
 import pickle
 import math
 from tqdm import tqdm
-if __name__ == '__main__':
-    from preprocessing.data import *
-else:
-    from tensor_hero.preprocessing.data import *
+from tensor_hero.preprocessing.data import *
 
 '''
 This script was formerly implemented as m1_preprocessing.py
@@ -293,9 +290,3 @@ def populate_model_1_training_data(training_data_path, model_1_training_path, sp
     f.close()
 
     return
-
-if __name__ == '__main__':
-    sys.exit(0)
-    model_1_training_path = Path.cwd() / 'Training Data' / 'Training Data' / 'Model 1 Training'
-    # print(training_data_path)
-    populate_model_1_training_data(model_1_training_path.parent, model_1_training_path)

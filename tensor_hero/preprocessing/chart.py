@@ -4,6 +4,8 @@ from itertools import combinations
 
 '''
 Contains functions related to processing .chart files
+
+These are mostly leveraged by ./data.py -> populate_processed_folder()
 '''
 
 def chart2tensor(path, print_release_notes=False):
