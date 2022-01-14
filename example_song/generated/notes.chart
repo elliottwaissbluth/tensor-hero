@@ -1,0 +1,22 @@
+[Song]
+{
+  Name = "model12"
+  Artist = "Forrest"
+  Charter = "tensorhero"
+  Offset = 0
+  Resolution = 192
+  Genre = "electronic"
+  MediaType = "cd"
+  MusicStream = "song.ogg"
+}
+[SyncTrack]
+{
+  0 = TS 1
+  0 = B 31250
+}
+[Events]
+{
+}
+[ExpertSingle]
+{
+}
