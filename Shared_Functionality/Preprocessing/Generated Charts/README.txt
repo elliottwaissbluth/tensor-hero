@@ -1,2 +1,0 @@
-This folder was used during the debugging process while building the preprocessing pipeline
-Not much is useful here, but an example of the format of our .chart outputs could be drawn from 'new song.chart'

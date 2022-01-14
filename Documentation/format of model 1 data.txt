@@ -1,4 +1,4 @@
-Model 1 uses one hot encodings as output from the decoder. This describes the meaning of that one hot encoding.
+Model 1 uses one hot encodings as output from the decoder.
 
 There are 435 "words" in our vocabulary.
     - 32 for note representations
