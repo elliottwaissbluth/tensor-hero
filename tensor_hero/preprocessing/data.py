@@ -1,16 +1,13 @@
 from pathlib import Path
 import os
 import sys
+import shutil
+import traceback
 from tqdm import tqdm
 import numpy as np
-if __name__ == '__main__':
-    from chart import chart2tensor
-    from audio import compute_mel_spectrogram
-    from resources.resources import simplified_note_dict
-else:
-    from tensor_hero.preprocessing.chart import chart2tensor
-    from tensor_hero.preprocessing.audio import compute_mel_spectrogram
-    from tensor_hero.preprocessing.resources.resources import simplified_note_dict
+from tensor_hero.preprocessing.chart import chart2tensor
+from tensor_hero.preprocessing.audio import compute_mel_spectrogram
+from tensor_hero.preprocessing.resources.resources import simplified_note_dict
 __release_keys = list(np.arange(187, 218))
 __release_keys.append(224)
 
@@ -79,12 +76,58 @@ def __match_tensor_lengths(notes_array, song):
     - 1D numpy array: notes array matched to length of song
     '''
     
-    length = song.shape[2]
+    length = song.shape[1]
     notes = np.zeros(length)
     notes[0:(notes_array.shape[0])] = notes_array
 
     return notes
 
+def __check_for_sub_packs(unprocessed_path):
+    '''
+    Checks whether the track packs in unprocessed_path link directly to songs or if they are organized
+    into sub-packs. Returns list of paths of track packs with sub-packs
+    
+    ~~~~ ARGUMENTS ~~~~
+    - unprocessed_path (Path): Path to unprocessed training data
+    
+    ~~~~ RETURNS ~~~~
+    - list of Paths: Paths to track pack directories that contain sub-packs
+    '''
+    sub_packs = []
+    for track_pack in os.listdir(unprocessed_path):
+        if track_pack in ['Thumbs.db', '.DS_Store']:
+            continue
+        for sub_pack in os.listdir(unprocessed_path / track_pack):
+            if sub_pack in ['Thumbs.db', '.DS_Store']:
+                continue
+            for song in os.listdir(unprocessed_path / track_pack / sub_pack):
+                if song in ['Thumbs.db', '.DS_Store']:
+                    continue
+                if os.path.isdir(unprocessed_path / track_pack / sub_pack / song):
+                    sub_packs.append(unprocessed_path / track_pack)
+                    break
+                break
+            break
+    return sub_packs
+
+def __pop_sub_packs(sub_packs):
+    '''
+    Takes the songs within the sub-packs and copies them outside their sub-pack directory to the track pack directory
+    
+    ~~~~ ARGUMENTS ~~~~
+    - sub_packs (list of Paths): Path to track pack directories that contain sub-packs
+                                 Should be the output of __check_for_sub_packs
+    '''
+    # Parse each sub-pack and move the songs to the track pack directory, then delete the sub-pack
+    for track_pack in sub_packs:
+        for sub_pack in [track_pack / x for x in os.listdir(track_pack) if x not in ['Thumbs.db', '.DS_Store']]:
+            for song in [track_pack / sub_pack / y for y in os.listdir(track_pack / sub_pack) if y not in ['Thumbs.db', '.DS_Store']]:
+                # Move song directory outside sub_pack
+                if os.path.exists(track_pack / song.stem):
+                    shutil.rmtree(track_pack / song.stem)
+                shutil.move(song, track_pack / song.stem)
+            # Delete sub_pack folder
+            shutil.rmtree(sub_pack)
 
 def populate_processed_folder(unprocessed_data_path, processed_data_path, REPLACE_NOTES = False):
     '''
@@ -104,25 +147,32 @@ def populate_processed_folder(unprocessed_data_path, processed_data_path, REPLAC
         - 'song_size' (float): spectrogram data size in GB
         - 'notes_size' (float): notes arrays data size in GB
     '''
+    # Extract songs from sub-packs, if the track pack includes sub-packs
+    sub_packs = __check_for_sub_packs(unprocessed_data_path)
+    __pop_sub_packs(sub_packs)
 
     wrong_format_charts = []    # Holds paths to charts not in .chart format
     multiple_audio_songs = []   # Holds paths to charts with multiple audio files
     processed = []              # Holds paths to song folders that were successfully processed
     song_size = 0               # Total audio data size, in gigabytes
     notes_size = 0              # Total note data size, in gigabytes
-    
+   
     for dirName, _, fileList in tqdm(os.walk(unprocessed_data_path)):  # Walk through training data directory
-        if not fileList or fileList == ['.DS_Store']:
+        if not fileList or fileList in [['.DS_Store'], ['Thumbs.db']]:
+            track_pack_ = Path(dirName).parent.stem
             continue
-        
+
         track_pack_ = Path(dirName).parent.stem     # track pack name
         song_ = Path(dirName).stem                  # song name
-
+        
         processed_path = processed_data_path / track_pack_ / song_          # processed song folder
         unprocessed_path = unprocessed_data_path / track_pack_ / song_      # unprocessed song folder
-        processed_song_path = processed_path / 'song.npy'                   # spectrogram
+        processed_song_path = processed_path / 'spectrogram.npy'            # spectrogram
         processed_notes_path = processed_path / 'notes.npy'                 # notes array
 
+        audio_file_name = __get_audio_file_name(fileList)
+        unprocessed_song_path = unprocessed_path / audio_file_name
+        
         if REPLACE_NOTES:
             if processed_notes_path.exists():
                 os.remove(processed_notes_path)  # Delete because I accidentally saved the same array hundreds of times lol
@@ -136,16 +186,19 @@ def populate_processed_folder(unprocessed_data_path, processed_data_path, REPLAC
                     os.rmdir(processed_path)
             continue
 
-        # Make folder in 'Processed' if it doesn't already exist
+        # Make folder for directory in 'Processed' if it doesn't already exist
+        if not processed_path.parent.exists():
+            os.mkdir(processed_path.parent)
         if not processed_path.exists():
             os.mkdir(processed_path)
 
-        # Create note tensor for song
+        # Create note array for song
         try:
             notes_array = np.array(chart2tensor(unprocessed_path / 'notes.chart', print_release_notes = False)).astype(int)
         except TypeError as err:
             print('{}, {} .chart file is in the wrong format, skipping'.format(track_pack_, song_))
             print("Type Error: {0}".format(err))
+            print(traceback.format_exc()) 
             wrong_format_charts.append(unprocessed_song_path)
             if processed_path.exists():
                 if len(os.listdir(processed_path)) == 0: # If the folder exists but is empty
@@ -154,19 +207,17 @@ def populate_processed_folder(unprocessed_data_path, processed_data_path, REPLAC
         except:
             print('{}, {} .chart file is in the wrong format, skipping'.format(track_pack_, song_))
             print('Unknown Error: {0}'.format(sys.exc_info()[0]))
+            print(traceback.format_exc())
             wrong_format_charts.append(unprocessed_song_path)
             if processed_path.exists():
                 if len(os.listdir(processed_path)) == 0: # If the folder exists but is empty
                     os.rmdir(processed_path)
             continue
         
-        audio_file_name = __get_audio_file_name(fileList)
-        unprocessed_song_path = unprocessed_path / audio_file_name
-
         # Check if song has already been processed
         # If it has, load it, because the notes array will be matched to its length
         if processed_song_path.exists():
-            print('{} audio has already been processed'.format(str(Path(processed_path)).split('\\')[-1]))
+            print('{} audio has already been processed'.format(processed_song_path.stem))
             song = np.load(processed_song_path)
         else:
             song = compute_mel_spectrogram(unprocessed_song_path)
@@ -349,13 +400,3 @@ def populate_with_simplified_notes(processed_directory):
             with open(str(processed_directory / x / y / 'notes_simplified.npy'), 'wb') as f:
                 np.save(f, new_notes)
             f.close()
-
-
-
-if __name__ == '__main__':
-    unprocessed_path = Path.cwd() / 'Training Data' / 'Training Data' / 'Unprocessed'
-    processed_path = Path.cwd() / 'Training Data' / 'Training Data' / 'Processed'
-    
-    populate_processed_folder(unprocessed_path, processed_path)
-    # unprocessed_path = Path(r'/Users/ewaissbluth/Documents/GitHub/tensor-hero/Training Data/Training Data/Unprocessed')
-    # populate_processed_folder_with_spectrograms(unprocessed_path)

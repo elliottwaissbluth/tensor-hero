@@ -75,19 +75,22 @@ def __create_scatter_axes(notes, ax=None):
 
 def slice_notes(notes, start=0, end=2):
     '''
-    Takes a notes array and slices it between start and end in seconds
+    Takes a notes array or spectrogram and slices it between start and end in seconds
     
     ~~~~ ARGUMENTS ~~~~
-    - notes (1D numpy array): notes array
+    - notes (1D numpy array or 2D numpy array): notes array or spectrogram
     - start (int): start of slice relative to beginning of song in seconds
     - end (int): end of slice relative to beginning of song in seconds
    
    ~~~~ RETURNS ~~~~
-   1D numpy array: notes array sliced between start and end
+   1D numpy array or 2D numpy array: notes array or spectrogramsliced between start and end
     '''
     assert start < end, "Error: start value must be less than end value"
     start_tick, end_tick = start*100, end*100  # ticks are in 10ms bins
-    return notes[start_tick:end_tick]
+    if len(notes.shape) == 1:
+        return notes[start_tick:end_tick]
+    else:
+        return notes[:, start_tick:end_tick]
 
 def plot_chart(ground_truth=None, candidate=None, audio=None, SHOW=True):
     '''

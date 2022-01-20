@@ -162,7 +162,7 @@ def shift_ticks(notes, song_metadata, time_signatures, BPMs):
         - Parameters come from chart2dict 
     '''
     # Split the song into bins corresponding to particular time signatures and BPMs
-
+    
     # First, assemble some lists from the preprocessing step
     note_keys = list(zip(notes['tick'], notes['N_S'], 
                     notes['note'], notes['duration']))                    # (tick, 'N_S', note)
