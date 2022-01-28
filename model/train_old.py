@@ -21,71 +21,14 @@ def load_model(model_directory):
 
     return params
 
-def initialize_model(params):
-    '''
-    Takes params and initializes a PyTorch model
-
-    Args:
-        params ([type]): [description]
-
-    Raises:
-        SystemExit: [description]
-
-    Returns:
-        [type]: [description]
-    '''
-    # Ask user whether they will load a pretrained model to continue training or initialize a new model
-    response = str(input('Load from pretrained model? (y/n): ')).lower()
-    while response not in ['y', 'n']:
-        response = str(input('invalid input\nAre the parameters correct (y/n)?: ')).lower()
-        
-    if response == 'y':  # If loading from pretrained model, load its weights from its directory
-        response = str(input('Enter name of model to load: '))  # This will be the name of the directory under ./model/saved_models
-        while not os.path.isdir(Path.cwd() / 'model' / 'saved_models' / response):
-            print('Error: {} is not a valid directory'.format(response))
-            response = str(input('Enter name of model to load: '))
-        model_directory = Path.cwd() / 'model' / 'saved_models' / response
-        params = load_model(model_directory)
-
-    else:  # If initializing new model, create a new directory for it
-        while os.path.isdir(Path.cwd() / 'model' / 'saved_models' / params['model_name']):
-            new_name = input('Directory already exists.\nEnter new model name: ')
-            params['model_name'] = str(new_name)
-        os.mkdir(Path.cwd() / 'model' / 'saved_models' / params['model_name'])
-
-    params['model_file_name'] = params['model_name'] + '.pt'  # Holds weights of model
-    params['model_outfile'] = Path.cwd() / 'model' / 'saved_models' / params['model_name'] / params['model_file_name']  # Full path to weights of model
-
-    # Validate parameters
-    print(json.dumps(params, indent=4))
-    response = str(input('Are the parameters correct (y/n)?: ')).lower()
-    while response not in ['y', 'n']:
-        response = str(input('invalid input\nAre the parameters correct (y/n)?: ')).lower()
-    if response == 'n':
-        raise SystemExit(0)
-
-    # Gather description of experiment from user
-    if not 'experiment_description' in params.keys():
-        experiment_description = input('Enter experiment description: ')
-        params['experiment_description'] = experiment_description
-
-    # Save parameters
-    with open(str(Path.cwd() / 'model'/ 'saved_models' / params['model_name'] / 'params.pkl'), 'wb') as f:
-        pickle.dump(params, f)
-    f.close()
-    
-    print('parameters saved\n')
-    
-    return params
-
 def main():
         # NOTE: Without if __name__ == '__main__', multithreading makes this script impossible to run
         
-        # Edit the parameters of the model, be
+        # control the parameters of the run here
         params = {
             'training_data' : 'train separated',     # CHANGEME (these parameters must be changed each experiment)
-            'model_name' : 'model12',                # CHANGEME
-            'optimizer' : 'Adam',                    # CHANGEME (maybe not this one, but you do have to fill it in manually)
+            'model_name' : 'model13',        # CHANGEME
+            'optimizer' : 'Adam',           # CHANGEME (maybe not this one, but you do have to fill it in manually)
             'train_path' : r'X:\Training Data\Model 1 Training Separated\train',
 
             'num_epochs' : 500,
@@ -110,10 +53,77 @@ def main():
 
             'date' : datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
         }
-        
-        params = initialize_model(params)
-        
+
+
+        # ---------------------------------------------------------------------------- #
+        #                              STORAGE PARAMETERS                              #
+        # ---------------------------------------------------------------------------- #
+
+        # create folder for model, this code prevents unwanted overwrites
+        LOAD = False
+        response = str(input('Load from pretrained model? (y/n): ')).lower()
+        while response not in ['y', 'n']:
+            print('invalid input')
+            response = str(input('Are the parameters correct (y/n)?: ')).lower()
+        if response == 'y':
+            LOAD = True
+            response = str(input('Enter name of model to load: '))
+            while not os.path.isdir(Path.cwd() / 'model' / 'saved models' / response):
+                print('Error: {} is not a valid directory'.format(response))
+                response = str(input('Enter name of model to load: '))
+            model_directory = Path.cwd() / 'model' / 'saved models' / response
+
+        if not LOAD:
+            # override is True if the directory already exists
+            override = os.path.isdir(Path.cwd() / 'model' / 'saved models' / params['model_name'])
+            if override:
+                new_name = input('Directory already exists.\nEnter new model name or override with \'o\': ')
+                if new_name == 'o':
+                    override = True
+                    # Use the description from last time
+                    with open(str(Path.cwd() / 'model' / 'saved models' / params['model_name'] / 'params.pkl'), 'rb') as f:
+                        old_params = pickle.load(f)
+                    f.close()
+                    if 'experiment_description' in old_params.keys():
+                        params['experiment_description'] = old_params['experiment_description']
+                else:
+                    params['model_name'] = str(new_name)
+
+            # make directory for model and create model_file name
+            if not override:
+                os.mkdir(Path.cwd() / 'model' / 'saved models' / params['model_name'])
+
+        else:
+            params = load_model(model_directory)
+
+        params['model_file_name'] = params['model_name'] + '.pt'
+        model_outfile = Path.cwd() / 'model' / 'saved models' / params['model_name'] / params['model_file_name']
         writer = SummaryWriter(r'runs/'+params['model_name'])
+
+        # ---------------------------------------------------------------------------- #
+        #                            EXPERIMENT DESCRIPTION                            #
+        # ---------------------------------------------------------------------------- #
+
+        # Validate parameters
+        print(json.dumps(params, indent=4))
+        response = str(input('Are the parameters correct (y/n)?: ')).lower()
+        while response not in ['y', 'n']:
+            print('invalid input')
+            response = str(input('Are the parameters correct (y/n)?: ')).lower()
+        if response == 'n':
+            raise SystemExit(0)
+
+        # Gather description of experiment from user
+        if not 'experiment_description' in params.keys():
+            experiment_description = input('Enter experiment description: ')
+            params['experiment_description'] = experiment_description
+
+        # Save parameters
+        with open(str(Path.cwd() / 'model'/ 'saved models' / params['model_name'] / 'params.pkl'), 'wb') as f:
+            pickle.dump(params, f)
+        f.close()
+        print('parameters saved\n')
+
 
         # ---------------------------------------------------------------------------- #
         #                               MODEL PARAMETERS                               #
@@ -172,7 +182,7 @@ def main():
         ).to(device)
 
         if LOAD:
-            state_dict_path = str(Path.cwd() / 'model'/ 'saved_models' / params['model_name'] / ((params['model_name']) + '.pt'))
+            state_dict_path = str(Path.cwd() / 'model'/ 'saved models' / params['model_name'] / ((params['model_name']) + '.pt'))
             model.load_state_dict(torch.load(state_dict_path))
 
         # torch.save(model.state_dict(), 'model.pt')
@@ -223,7 +233,7 @@ def main():
             print(f'\nEpoch {epoch+1}/{num_epochs}')
             print(f'Training Loss: {loss.item()}')
             torch.save(model.state_dict(), str(model_outfile))
-            with open(str(Path.cwd() / 'model'/ 'saved_models' / params['model_name'] / 'params.pkl'), 'wb') as f:
+            with open(str(Path.cwd() / 'model'/ 'saved models' / params['model_name'] / 'params.pkl'), 'wb') as f:
                 pickle.dump(params, f)
             f.close()
             print('model saved')

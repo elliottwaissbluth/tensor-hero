@@ -11,9 +11,17 @@ import os
 import json
 import pickle
 
-def load_model(model_directory):
+def __load_model(model_directory):
     '''
-    loads model and param dict from model_directory. useful for continuing training
+    Loads model and param dict from model_directory. useful for continuing training
+    Helper function for initialize_params()
+    
+    ~~~~ ARGUMENTS ~~~~
+    - model_directory (Path): Folder containing model weights and params
+        - probably ./model/saved_models/<model name>
+    
+    ~~~~ RETURNS ~~~~
+    - dict: params loaded from model directory
     '''
     with open(str(model_directory / 'params.pkl'), 'rb') as f:
         params = pickle.load(f)
@@ -21,14 +29,108 @@ def load_model(model_directory):
 
     return params
 
+def initialize_params(params):
+    '''
+    Takes the original params and modifies them to match the current training objective.
+        - Will load params from model directory if desired
+        - Initializes new params for training a new model
+        - Asks for user input regarding descriptions of new models
+
+    ~~~~ ARGUMENTS ~~~~
+    - params (dict): Dictionary containing relevant model information. See definition in main() for more information.
+
+    ~~~~ RAISES ~~~~
+    - SystemExit: If the experiment is to be aborted.
+
+    ~~~~ RETURNS ~~~~
+    - dict: model and training parameters
+    '''
+    # Ask user whether they will load a pretrained model to continue training or initialize a new model
+    response = str(input('Load from pretrained model? (y/n): ')).lower()
+    while response not in ['y', 'n']:
+        response = str(input('invalid input\nAre the parameters correct (y/n)?: ')).lower()
+        
+    if response == 'y':  # If loading from pretrained model, load its weights from its directory
+        response = str(input('Enter name of model to load: '))  # This will be the name of the directory under ./model/saved_models
+        while not os.path.isdir(Path.cwd() / 'model' / 'saved_models' / response):
+            print('Error: {} is not a valid directory'.format(response))
+            response = str(input('Enter name of model to load: '))
+        model_directory = Path.cwd() / 'model' / 'saved_models' / response
+        params = __load_model(model_directory)
+        params['LOAD'] = True
+
+    else:  # If initializing new model, create a new directory for it
+        while os.path.isdir(Path.cwd() / 'model' / 'saved_models' / params['model_name']):
+            new_name = input('Directory already exists.\nEnter new model name: ')
+            params['model_name'] = str(new_name)
+        os.mkdir(Path.cwd() / 'model' / 'saved_models' / params['model_name'])
+        params['LOAD'] = False
+
+    params['model_file_name'] = params['model_name'] + '.pt'  # Holds weights of model
+    params['model_outfile'] = str(Path.cwd() / 'model' / 'saved_models' / params['model_name'] / params['model_file_name'])  # model directory
+
+    # Validate parameters
+    print(json.dumps(params, indent=4))
+    response = str(input('Are the parameters correct (y/n)?: ')).lower()
+    while response not in ['y', 'n']:
+        response = str(input('invalid input\nAre the parameters correct (y/n)?: ')).lower()
+    if response == 'n':
+        raise SystemExit(0)
+
+    # Gather description of experiment from user
+    if not 'experiment_description' in params.keys():
+        experiment_description = input('Enter experiment description: ')
+        params['experiment_description'] = experiment_description
+
+    # Save parameters
+    with open(str(Path.cwd() / 'model'/ 'saved_models' / params['model_name'] / 'params.pkl'), 'wb') as f:
+        pickle.dump(params, f)
+    f.close()
+    
+    print('parameters saved\n')
+    
+    return params
+
+def initialize_model(params, device):
+    '''
+    Takes params and the device (CUDA or CPU) and initializes a transformer model, as defined in ./tensor_hero/model.py
+    
+    ~~~~ ARGUMENTS ~~~~
+    - params (dict): Model and training parameters. Should be the output from initialize_params()
+    - device (str): "CUDA" or "CPU"
+    
+    ~~~~ RETURNS ~~~~
+        PyTorch model: Transformer model initialized with params and sent to device. Defined in ./tensor_hero/model.py
+    '''
+    model = Transformer(
+            embedding_size = params['embedding_size'],
+            trg_vocab_size = params['trg_vocab_size'],
+            num_heads = params['num_heads'],
+            num_encoder_layers = params['num_encoder_layers'],
+            num_decoder_layers = params['num_decoder_layers'],
+            forward_expansion = params['embedding_size']*params['forward_expansion'],
+            dropout = params['dropout'],
+            max_len = params['max_src_len'],
+            device = device,
+        ).to(device)
+
+    if params['LOAD']:
+        state_dict_path = str(Path.cwd() / 'model'/ 'saved_models' / params['model_name'] / ((params['model_name']) + '.pt'))
+        model.load_state_dict(torch.load(state_dict_path))
+    
+    return model
+
 def main():
         # NOTE: Without if __name__ == '__main__', multithreading makes this script impossible to run
         
-        # control the parameters of the run here
+        # ---------------------------------------------------------------------------- #
+        #                              INITIAL PARAMETERS                              #
+        # ---------------------------------------------------------------------------- #
+        
         params = {
             'training_data' : 'train separated',     # CHANGEME (these parameters must be changed each experiment)
-            'model_name' : 'model12',        # CHANGEME
-            'optimizer' : 'Adam',           # CHANGEME (maybe not this one, but you do have to fill it in manually)
+            'model_name' : 'model12',                # CHANGEME
+            'optimizer' : 'Adam',                    # CHANGEME (maybe not this one, but you do have to fill it in manually)
             'train_path' : r'X:\Training Data\Model 1 Training Separated\train',
 
             'num_epochs' : 500,
@@ -53,87 +155,29 @@ def main():
 
             'date' : datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
         }
-
-
+        
+        params = initialize_params(params)
+        
         # ---------------------------------------------------------------------------- #
-        #                              STORAGE PARAMETERS                              #
-        # ---------------------------------------------------------------------------- #
-
-        # create folder for model, this code prevents unwanted overwrites
-        LOAD = False
-        response = str(input('Load from pretrained model? (y/n): ')).lower()
-        while response not in ['y', 'n']:
-            print('invalid input')
-            response = str(input('Are the parameters correct (y/n)?: ')).lower()
-        if response == 'y':
-            LOAD = True
-            response = str(input('Enter name of model to load: '))
-            while not os.path.isdir(Path.cwd() / 'model' / 'saved models' / response):
-                print('Error: {} is not a valid directory'.format(response))
-                response = str(input('Enter name of model to load: '))
-            model_directory = Path.cwd() / 'model' / 'saved models' / response
-
-        if not LOAD:
-            # override is True if the directory already exists
-            override = os.path.isdir(Path.cwd() / 'model' / 'saved models' / params['model_name'])
-            if override:
-                new_name = input('Directory already exists.\nEnter new model name or override with \'o\': ')
-                if new_name == 'o':
-                    override = True
-                    # Use the description from last time
-                    with open(str(Path.cwd() / 'model' / 'saved models' / params['model_name'] / 'params.pkl'), 'rb') as f:
-                        old_params = pickle.load(f)
-                    f.close()
-                    if 'experiment_description' in old_params.keys():
-                        params['experiment_description'] = old_params['experiment_description']
-                else:
-                    params['model_name'] = str(new_name)
-
-            # make directory for model and create model_file name
-            if not override:
-                os.mkdir(Path.cwd() / 'model' / 'saved models' / params['model_name'])
-
-        else:
-            params = load_model(model_directory)
-
-        params['model_file_name'] = params['model_name'] + '.pt'
-        model_outfile = Path.cwd() / 'model' / 'saved models' / params['model_name'] / params['model_file_name']
-        writer = SummaryWriter(r'runs/'+params['model_name'])
-
-        # ---------------------------------------------------------------------------- #
-        #                            EXPERIMENT DESCRIPTION                            #
-        # ---------------------------------------------------------------------------- #
-
-        # Validate parameters
-        print(json.dumps(params, indent=4))
-        response = str(input('Are the parameters correct (y/n)?: ')).lower()
-        while response not in ['y', 'n']:
-            print('invalid input')
-            response = str(input('Are the parameters correct (y/n)?: ')).lower()
-        if response == 'n':
-            raise SystemExit(0)
-
-        # Gather description of experiment from user
-        if not 'experiment_description' in params.keys():
-            experiment_description = input('Enter experiment description: ')
-            params['experiment_description'] = experiment_description
-
-        # Save parameters
-        with open(str(Path.cwd() / 'model'/ 'saved models' / params['model_name'] / 'params.pkl'), 'wb') as f:
-            pickle.dump(params, f)
-        f.close()
-        print('parameters saved\n')
-
-
-        # ---------------------------------------------------------------------------- #
-        #                               MODEL PARAMETERS                               #
+        #                            TENSORBOARD PARAMETERS                            #
         # ---------------------------------------------------------------------------- #
         
-        max_trg_len = params['max_trg_len'] # length of all target note sequences, holds 99 notes max
-        max_src_len = params['max_src_len']
-        pad_idx = params['pad_idx']
+        writer = SummaryWriter(r'runs/'+params['model_name'])
+        hparam_dict = {
+            'batch_size' : params['batch_size'],
+            'embedding_size' : params['embedding_size'],
+            'learning_rate' : params['lr'],
+            'num_heads' : params['num_heads'],
+            'num_encoder_layers' : params['num_encoder_layers'],
+            'dropout' : params['dropout'],
+            'forward_expansion' : params['embedding_size']*params['forward_expansion']
+        }
 
-        # DataLoader parameters
+        
+        # ---------------------------------------------------------------------------- #
+        #                                  DATALOADER                                  #
+        # ---------------------------------------------------------------------------- #
+        
         dl_params = {
             'batch_size' : params['batch_size'],
             'shuffle' : params['shuffle'],
@@ -142,48 +186,20 @@ def main():
         }
 
         # Define data loaders
-        train_path = Path(params['train_path'])
-        # train_data = LazierDataset(train_path, max_src_len, max_trg_len, pad_idx)
-        train_data = LazierDataset(train_path, max_src_len, max_trg_len, pad_idx)
+        train_data = LazierDataset(Path(params['train_path']), params['max_src_len'], params['max_trg_len'], params['pad_idx'])
         train_loader = torch.utils.data.DataLoader(train_data, **dl_params)
-        # val_path = Path(r'X:\Training Data\Model 1 Training\val')
-        # val_data = LazierDataset(val_path, max_src_len, max_trg_len, pad_idx)
-        # val_loader = torch.utils.data.DataLoader(val_data, **dl_params)
 
+        # ---------------------------------------------------------------------------- #
+        #                              TRAINING PARAMETERS                             #
+        # ---------------------------------------------------------------------------- #
+        
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
         # Training hyperparameters
         learning_rate = params['lr']
-        batch_size = params['batch_size']
+        num_epochs = params['num_epochs']
 
-        # Model hyperparameters
-        trg_vocab_size = params['trg_vocab_size']  # <output length>
-        embedding_size = params['embedding_size']
-        num_heads = params['num_heads']
-        num_encoder_layers = params['num_encoder_layers']
-        num_decoder_layers = params['num_decoder_layers']
-        dropout = params['dropout']
-        max_len = max_src_len
-        forward_expansion = params['embedding_size']*params['forward_expansion']
-
-        step = params['last_global_step']  # how many times the model has gone through some input
-
-        # Define model
-        model = Transformer(
-            embedding_size,
-            trg_vocab_size,
-            num_heads,
-            num_encoder_layers,
-            num_decoder_layers,
-            forward_expansion,
-            dropout,
-            max_len,
-            device,
-        ).to(device)
-
-        if LOAD:
-            state_dict_path = str(Path.cwd() / 'model'/ 'saved models' / params['model_name'] / ((params['model_name']) + '.pt'))
-            model.load_state_dict(torch.load(state_dict_path))
+        model = initialize_model(params, device) 
 
         # torch.save(model.state_dict(), 'model.pt')
         optimizer = optim.Adam(model.parameters(), lr=learning_rate)
@@ -191,7 +207,10 @@ def main():
         # criterion = nn.CrossEntropyLoss() # Multi-class loss, when you have a many class prediction problem
         criterion = nn.CrossEntropyLoss(ignore_index=params['pad_idx'])
 
-        num_epochs = params['num_epochs']
+        # ---------------------------------------------------------------------------- #
+        #                                 TRAINING LOOP                                #
+        # ---------------------------------------------------------------------------- #
+        
         model.train() # Put model in training mode, so that it knows it's parameters should be updated
         for epoch in range(num_epochs):
             for batch_idx, batch in enumerate(train_loader):
@@ -199,20 +218,18 @@ def main():
                 spec, notes = batch[0].to(device), batch[1].to(device)
 
                 # forward prop
-                output = model(spec, notes[..., :-1]) # Don't pass the last element into the decoder, want it to be predicted
-                # print('output shape : {}'.format(output.shape))
-                # output = output.reshape(-1, output.shape[2]) # Reshape the output for use by criterion
+                output = model(spec, notes[..., :-1])           # Don't pass the last element into the decoder, want it to be predicted
+                # output = output.reshape(-1, output.shape[2])  # Reshape the output for use by criterion
                 notes = notes[..., 1:] # .reshape(-1)           # Same for the notes
-                # print('notes shape 2 {}'.format(notes.shape))
-                optimizer.zero_grad()                        # Zero out the gradient so it doesn't accumulate
+                optimizer.zero_grad()                           # Zero out the gradient so it doesn't accumulate
 
-                loss = criterion(output.permute(0,2,1), notes)     # Calculate loss, this is output vs ground truth
+                loss = criterion(output.permute(0,2,1), notes)  # Calculate loss, this is output vs ground truth
                 
                 if batch_idx%25 == 0:
-                    print('\nEpoch {}, Batch {}'.format(epoch+1,batch_idx))
+                    print('\nEpoch {}, Batch {}'.format(epoch+1, batch_idx))
                     print('Training Loss: {}'.format(loss.item()))
                 
-                loss.backward()                     # Compute loss for every node in the computation graph
+                loss.backward()     # Compute loss for every node in the computation graph
 
                 # This line to avoid the exploding gradient problem
                 torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1)
@@ -222,21 +239,22 @@ def main():
 
                 # Write to tensorboard
                 writer.add_scalar("Training Loss", loss, global_step=params['last_global_step'])
+                # writer.add_hparams(hparam_dict=hparam_dict, metric_dict={'training_loss' : loss}) # NOTE: Move this outside the for loop
 
-                
-                
                 # if batch_idx%100 == 0:
                     # print('Ground Truth (sample) : {}'.format(notes[0]))
                     # print('Canidate (sample)     : {}'.format(torch.argmax(output[0], dim=1)))
                 
-
+            # Print training update
             print(f'\nEpoch {epoch+1}/{num_epochs}')
             print(f'Training Loss: {loss.item()}')
-            torch.save(model.state_dict(), str(model_outfile))
-            with open(str(Path.cwd() / 'model'/ 'saved models' / params['model_name'] / 'params.pkl'), 'wb') as f:
+            
+            # Save the model every epoch
+            torch.save(model.state_dict(), str(params['model_outfile']))
+            with open(str(Path.cwd() / 'model'/ 'saved_models' / params['model_name'] / 'params.pkl'), 'wb') as f:
                 pickle.dump(params, f)
-            f.close()
             print('model saved')
+            
             # # Evaluate on validation set
             # model.eval()
             # for batch_idx, batch in enumerate(val_loader):
@@ -254,7 +272,5 @@ def main():
                 # step += 1
             # print('Validation Loss: {}'.format(loss.item()))
 
-    
-    
 if __name__ == '__main__':
     main()
