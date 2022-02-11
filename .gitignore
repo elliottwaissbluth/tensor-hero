@@ -1,6 +1,7 @@
 __pycache__/
 .vscode/
 **/Training Data
+**/Training_Data
 .DS_Store
 **/Prototyping/runs*
 **/Model_1/Preprocessing/keys

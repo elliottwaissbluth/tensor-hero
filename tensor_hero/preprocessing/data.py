@@ -129,7 +129,8 @@ def __pop_sub_packs(sub_packs):
             # Delete sub_pack folder
             shutil.rmtree(sub_pack)
 
-def populate_processed_folder(unprocessed_data_path, processed_data_path, REPLACE_NOTES = False):
+def populate_processed_folder(unprocessed_data_path, processed_data_path, REPLACE_NOTES = False,
+                              PRINT_TRACEBACK=True):
     '''
     Converts raw downloaded Clone Hero data into processed spectrograms and notes arrays.
     Populates processed_data_path by processing data in unprocessed_data_path.
@@ -197,21 +198,23 @@ def populate_processed_folder(unprocessed_data_path, processed_data_path, REPLAC
             notes_array = np.array(chart2tensor(unprocessed_path / 'notes.chart', print_release_notes = False)).astype(int)
         except TypeError as err:
             print('{}, {} .chart file is in the wrong format, skipping'.format(track_pack_, song_))
-            print("Type Error: {0}".format(err))
-            print(traceback.format_exc()) 
+            if PRINT_TRACEBACK:
+                print("Type Error: {0}".format(err))
+                print(traceback.format_exc()) 
             wrong_format_charts.append(unprocessed_song_path)
             if processed_path.exists():
-                if len(os.listdir(processed_path)) == 0: # If the folder exists but is empty
-                    os.rmdir(processed_path)
+                # if len(os.listdir(processed_path)) == 0: # If the folder exists but is empty
+                os.rmdir(processed_path)
             continue
         except:
             print('{}, {} .chart file is in the wrong format, skipping'.format(track_pack_, song_))
-            print('Unknown Error: {0}'.format(sys.exc_info()[0]))
-            print(traceback.format_exc())
+            if PRINT_TRACEBACK:
+                print('Unknown Error: {0}'.format(sys.exc_info()[0]))
+                print(traceback.format_exc())
             wrong_format_charts.append(unprocessed_song_path)
             if processed_path.exists():
-                if len(os.listdir(processed_path)) == 0: # If the folder exists but is empty
-                    os.rmdir(processed_path)
+                # if len(os.listdir(processed_path)) == 0: # If the folder exists but is empty
+                os.rmdir(processed_path)
             continue
         
         # Check if song has already been processed
@@ -220,9 +223,18 @@ def populate_processed_folder(unprocessed_data_path, processed_data_path, REPLAC
             print('{} audio has already been processed'.format(processed_song_path.stem))
             song = np.load(processed_song_path)
         else:
-            song = compute_mel_spectrogram(unprocessed_song_path)
-            np.save(processed_song_path, song)
-        
+            try:
+                song = compute_mel_spectrogram(unprocessed_song_path)
+                np.save(processed_song_path, song)
+            except:
+                print('{}, {} .chart file is in the wrong format, skipping'.format(track_pack_, song_))
+                if PRINT_TRACEBACK:
+                    print(traceback.format_exc()) 
+                wrong_format_charts.append(unprocessed_song_path)
+                if processed_path.exists():
+                    # if len(os.listdir(processed_path)) == 0: # If the folder exists but is empty
+                    os.rmdir(processed_path)
+                continue
         # Check if notes have already been processed
         if processed_notes_path.exists():
             pass
