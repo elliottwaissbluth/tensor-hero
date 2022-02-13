@@ -15,7 +15,6 @@ def compute_mel_spectrogram(song_path):
         -   dimensions = [frequency, time], frequency dimension is always 512
         -   each time slice represents 10 milliseconds
         -   log-scale, so max(spec) = 0, min(spec) = -80
-        -   70ms of silence appended to beginning and end of spectrogram
     '''
     data, sr = librosa.load(str(song_path))
     resampled = librosa.resample(data, sr, 44100)
