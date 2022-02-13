@@ -1,6 +1,7 @@
 __pycache__/
 .vscode/
 **/Training Data
+**/Training_Data
 .DS_Store
 **/Prototyping/runs*
 **/Model_1/Preprocessing/keys
@@ -26,3 +27,4 @@ Shared_Functionality/Preprocessing/Prototypes/note simplification/test/1. Joe Sa
 **/Generated_Songs
 **/Experiments
 colab_ogg_key_dict.pkl
+**/runs

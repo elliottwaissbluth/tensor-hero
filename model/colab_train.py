@@ -1,7 +1,7 @@
 from pathlib import Path
 import sys
 sys.path.insert(1, str(Path.cwd()))
-from tensor_hero.model import Transformer, LazierDataset
+from tensor_hero.model import ColabLazyDataset, Transformer, LazierDataset
 import torch
 from torch import nn
 from torch import optim
@@ -131,7 +131,7 @@ def main():
             'training_data' : 'train separated',     # CHANGEME (these parameters must be changed each experiment)
             'model_name' : 'model12',                # CHANGEME
             'optimizer' : 'Adam',                    # CHANGEME (maybe not this one, but you do have to fill it in manually)
-            'train_path' : r'X:\Training Data\Model 1 Training Separated\train',
+            'train_path' : r'X:\Training Data\training_ready\train',
 
             'num_epochs' : 500,
             'batch_size' : 12,
@@ -186,7 +186,7 @@ def main():
         }
 
         # Define data loaders
-        train_data = LazierDataset(Path(params['train_path']), params['max_src_len'], params['max_trg_len'], params['pad_idx'])
+        train_data = ColabLazyDataset(Path(params['train_path']), params['max_src_len'], params['max_trg_len'], params['pad_idx'])
         train_loader = torch.utils.data.DataLoader(train_data, **dl_params)
 
         # ---------------------------------------------------------------------------- #

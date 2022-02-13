@@ -5,6 +5,7 @@ import shutil
 import traceback
 from tqdm import tqdm
 import numpy as np
+import math
 from tensor_hero.preprocessing.chart import chart2tensor
 from tensor_hero.preprocessing.audio import compute_mel_spectrogram
 from tensor_hero.preprocessing.resources.resources import simplified_note_dict
@@ -129,7 +130,8 @@ def __pop_sub_packs(sub_packs):
             # Delete sub_pack folder
             shutil.rmtree(sub_pack)
 
-def populate_processed_folder(unprocessed_data_path, processed_data_path, REPLACE_NOTES = False):
+def populate_processed_folder(unprocessed_data_path, processed_data_path, REPLACE_NOTES = False,
+                              PRINT_TRACEBACK=True):
     '''
     Converts raw downloaded Clone Hero data into processed spectrograms and notes arrays.
     Populates processed_data_path by processing data in unprocessed_data_path.
@@ -197,21 +199,23 @@ def populate_processed_folder(unprocessed_data_path, processed_data_path, REPLAC
             notes_array = np.array(chart2tensor(unprocessed_path / 'notes.chart', print_release_notes = False)).astype(int)
         except TypeError as err:
             print('{}, {} .chart file is in the wrong format, skipping'.format(track_pack_, song_))
-            print("Type Error: {0}".format(err))
-            print(traceback.format_exc()) 
+            if PRINT_TRACEBACK:
+                print("Type Error: {0}".format(err))
+                print(traceback.format_exc()) 
             wrong_format_charts.append(unprocessed_song_path)
             if processed_path.exists():
-                if len(os.listdir(processed_path)) == 0: # If the folder exists but is empty
-                    os.rmdir(processed_path)
+                # if len(os.listdir(processed_path)) == 0: # If the folder exists but is empty
+                os.rmdir(processed_path)
             continue
         except:
             print('{}, {} .chart file is in the wrong format, skipping'.format(track_pack_, song_))
-            print('Unknown Error: {0}'.format(sys.exc_info()[0]))
-            print(traceback.format_exc())
+            if PRINT_TRACEBACK:
+                print('Unknown Error: {0}'.format(sys.exc_info()[0]))
+                print(traceback.format_exc())
             wrong_format_charts.append(unprocessed_song_path)
             if processed_path.exists():
-                if len(os.listdir(processed_path)) == 0: # If the folder exists but is empty
-                    os.rmdir(processed_path)
+                # if len(os.listdir(processed_path)) == 0: # If the folder exists but is empty
+                os.rmdir(processed_path)
             continue
         
         # Check if song has already been processed
@@ -220,9 +224,18 @@ def populate_processed_folder(unprocessed_data_path, processed_data_path, REPLAC
             print('{} audio has already been processed'.format(processed_song_path.stem))
             song = np.load(processed_song_path)
         else:
-            song = compute_mel_spectrogram(unprocessed_song_path)
-            np.save(processed_song_path, song)
-        
+            try:
+                song = compute_mel_spectrogram(unprocessed_song_path)
+                np.save(processed_song_path, song)
+            except:
+                print('{}, {} .chart file is in the wrong format, skipping'.format(track_pack_, song_))
+                if PRINT_TRACEBACK:
+                    print(traceback.format_exc()) 
+                wrong_format_charts.append(unprocessed_song_path)
+                if processed_path.exists():
+                    # if len(os.listdir(processed_path)) == 0: # If the folder exists but is empty
+                    os.rmdir(processed_path)
+                continue
         # Check if notes have already been processed
         if processed_notes_path.exists():
             pass
@@ -400,3 +413,267 @@ def populate_with_simplified_notes(processed_directory):
             with open(str(processed_directory / x / y / 'notes_simplified.npy'), 'wb') as f:
                 np.save(f, new_notes)
             f.close()
+
+
+# ---------------------------------------------------------------------------- #
+#                        TRANSFORMER DATA PREPROCESSING                        #
+# ---------------------------------------------------------------------------- #
+
+
+def __process_spectrogram(spec):
+    '''
+    Normalizes spectrogram in [0,1]
+    
+    ~~~~ ARGUMENTS ~~~~
+    - spec (2D numpy array):padded spectrogram, loaded from spectrogram.npy in processed folder
+    
+    ~~~~ RETURNS ~~~~
+    - 2D numpy array : Normalized spectrogram
+    '''
+    spec = (spec+80) / 80   # Regularize
+    return spec
+
+def __notes_to_output_space(notes):
+    '''
+    Takes a notes array as input, and outputs a matrix of numpy arrays in the output format specified
+    by sequence to sequence piano transcription.
+    
+    ~~~~ ARGUMENTS ~~~~
+    - notes (1D numpy array) : notes array
+    
+    ~~~~ RETURNS ~~~~
+    - 2D numpy array:
+        - Y axis is sequential note events, with each new row being a time event, then note event
+        - X axis is one hot encoded arrays, where the index will be fed into the transformer as output
+    '''
+    # Get number of notes in array
+    num_notes = np.count_nonzero(notes)
+
+    # Convert "218" i.e. open notes to
+    notes = np.where(notes == 218, 32, notes)
+
+    # Construct a numpy array of the proper dimensionality
+    # 32 positions for the one hot encoded notes, 400 for the absolute time
+    formatted = np.zeros(shape=(num_notes*2, 32 + 400))
+
+    # Loop through notes array and populate formatted
+    i = 0
+    for time_pos, x in enumerate(notes):
+        if x != 0:
+            formatted[2*i, time_pos+32] = 1  # One hot encode the time step
+            formatted[2*i+1, int(x)-1] = 1   # One hot encode the note
+            i += 1
+            
+    return formatted
+
+def __formatted_notes_to_indices(notes):
+    '''
+    Takes formatted notes and returns a 1D array of indices, reverse one hot operation.
+    Helper function for __prepare_notes_tensor()
+    ~~~~ ARGUMENTS ~~~~
+    notes (1D numpy array): formatted notes, as output by __notes_to_output_space()
+    
+    ~~~~ RETURNS ~~~~
+    indices (1D numpy array): 
+        - de-one hot encoded indices of note event series.
+        - the format is [time, note, time, note, etc...] 
+    '''
+    indices = np.argwhere(notes == 1)
+    indices = indices[:,-1].flatten()
+    return indices
+
+def __prepare_notes_tensor(notes):
+    '''
+    Takes formatted notes and converts them to the format suitable for PyTorch's transformer model.
+    Helper function for populate_model_1_training_data()
+    
+    ~~~~ ARGUMENTS ~~~~
+    - notes (1D numpy array): formatted notes, as output by __notes_to_output_space()
+    
+    ~~~~ RETURNS ~~~~
+    - 1D numpy array : notes with format [<sos>, time, note, time, note, etc..., <eos>]
+    '''
+    # Concatenate two extra dimensions for SOS and EOS to self.notes
+    notes_append = np.zeros(shape=(notes.shape[0], 2))
+    notes = np.c_[notes, notes_append]
+    # Add a row at the beginning and end of note for <sos>, <eos>
+    notes_append = np.zeros(shape=(1,notes.shape[1]))
+    notes = np.vstack([notes_append, notes, notes_append])
+    # Add proper values to self.notes
+    notes[0,-2] = 1  # <sos>
+    notes[-1,-1] = 1 # <eos>
+    notes = __formatted_notes_to_indices(notes)
+    return notes
+
+def preprocess_transformer_data(segment_length, training_data_path, train_val_test_probs, model_training_directory_name, COLAB=False):
+    '''
+    Takes a directory of processed song level training data and slices each song into 4 second segments.
+    Processed folder should already exist with simplified notes
+    Splits train, test, and validation at the song level.
+
+    If COLAB=False, file structure looks like
+
+    Training_Data
+    |----<model_training_directory_name>
+        |----train
+        |   |----<song name 1>
+        |   |   |----notes
+        |   |   |   |----1.npy
+        |   |   |   |----2.npy (etc)
+        |   |   |----spectrograms
+        |   |   |   |----1.npy
+        |   |   |   |----2.npy (etc)
+        |   |----<song name 2> (etc)
+        |----test
+        |----val
+    
+    If COLAB=True, file structure looks like
+
+    Training_Data
+    |----<model_training_directory_name>
+        |----train
+        |   |----<song name 1>
+        |   |   |----notes
+        |   |   |   |----1
+        |   |   |   |   |----1.npy
+        |   |   |   |   |----2.npy (etc)
+        |   |   |   |----2 (etc)
+        |   |   |----spectrograms
+        |   |   |   |----1
+        |   |   |   |   |----1.npy
+        |   |   |   |   |----2.npy (etc)
+        |   |   |   |----2 (etc)
+        |   |----<song name 2> (etc)
+        |----test
+        |----val
+    
+    ~~~~ ARGUMENTS ~~~~
+    - segment_length (int): 
+        - The number of elements in the time dimension of the notes arrays and spectrograms (typically 400)
+        - Each element corresponds to 10ms of time
+    - training_data_path (Path): Path to top level training data directory (probably tensor-hero/Training_Data)
+    - train_val_test_probs (3 element list):
+        - Determines how the dataset is split
+        - [Probability of song being placed in train, val, test]
+        - Must sum to 1
+    - model_training_directory_name (str):
+        - Within training_data_path, a folder of this name will be created to hold the processed transformer training data
+    - COLAB (bool): 
+        - If True, segments training data so folders do not exceed 40 total files
+        - This is necessary because COLAB does not work well with directories with large numbers of files
+    '''
+    assert sum(train_val_test_probs) == 1, 'ERROR: train_val_test_probs does not sum to 1'
+    
+    unprocessed_path = training_data_path / 'Unprocessed'
+    train_path = training_data_path / model_training_directory_name / 'train'
+    val_path = training_data_path / model_training_directory_name / 'val'
+    test_path = training_data_path / model_training_directory_name / 'test'
+
+    # Make directories if they don't exist
+    if not os.path.isdir(training_data_path / model_training_directory_name):
+        os.mkdir(training_data_path / model_training_directory_name)
+        print(f'made directory {str(training_data_path / model_training_directory_name)}')
+    if not os.path.isdir(train_path):
+        os.mkdir(train_path)
+        print(f'made directory {str(train_path)}')
+    if not os.path.isdir(val_path):
+        os.mkdir(val_path)
+        print(f'made directory {str(val_path)}')
+    if not os.path.isdir(test_path):
+        os.mkdir(test_path)
+        print(f'made directory {str(test_path)}')
+        
+    _, processed_list = get_list_of_ogg_files(unprocessed_path)
+
+    # Get paths of notes and corresponding paths of spectrograms
+    spec_paths = [song / 'spectrogram.npy' for song in processed_list]
+    notes_paths = [song / 'notes_simplified.npy' for song in processed_list]
+
+
+    # Used to create the outfile names of the saved slices
+    # Will also be able to use these in conjunction with "train_key", "test_key", and "val_key"
+    # to determine which indices go to which song
+    train_count = 0
+    val_count = 0
+    test_count = 0
+
+    for i in tqdm(range(len(processed_list))):
+        # Process spectrogram
+        try:
+            spec = np.load(spec_paths[i])
+        except FileNotFoundError:
+            print('There is no spectrogram at {}'.format(spec_paths[i]))
+            continue
+        except ValueError as err:
+            print(err)
+            print(traceback.format_exc())
+            continue
+        spec = __process_spectrogram(spec)
+
+        # Process notes
+        try:
+            notes = np.load(notes_paths[i])
+        except FileNotFoundError:
+            print('There is no notes_simplified at {}'.format(notes_paths[i]))
+            continue
+
+        assert notes.shape[0] == spec.shape[1], 'ERROR: Spectrogram and notes shape do not match'
+        
+        # Get number of segment_length second slices
+        num_slices = math.floor(spec.shape[1]/segment_length)
+        
+        # Split notes and spectrogram into bins
+        spec_bins = np.array([spec[:,j*segment_length:(j+1)*segment_length] for j in range(num_slices)])
+        notes_bins = np.array([notes[j*segment_length:(j+1)*segment_length] for j in range(num_slices)])
+        
+        # This list will hold the final note representations ready for the transformer
+        final_notes = []
+        for j in range(num_slices):
+            t_notes = __notes_to_output_space(notes_bins[j,:])
+            t_notes = __prepare_notes_tensor(t_notes)
+            final_notes.append(t_notes)
+        
+        # Randomly select whether it goes in train, val, or test based on the desired split
+        train_val_test_selection = np.random.choice(3, 1, p=train_val_test_probs)[0]
+        if train_val_test_selection == 0:
+            prepend_path = train_path
+        elif train_val_test_selection == 1:
+            prepend_path = val_path
+        else:
+            prepend_path = test_path
+
+        # Create a folder for the outfile
+        if not os.path.isdir(prepend_path / processed_list[i].stem): # Makes a folder with song name in correct subdirectory
+            os.mkdir(prepend_path / processed_list[i].stem)
+
+        if not COLAB:
+            for j in range(len(final_notes)):
+                spec_outfile = prepend_path / processed_list[i].stem / 'spectrograms' / (str(j) + '.npy')
+                if not os.path.isdir(spec_outfile.parent):
+                    os.mkdir(spec_outfile.parent)
+
+                notes_outfile = prepend_path / processed_list[i].stem / 'notes' / (str(j) + '.npy') 
+                if not os.path.isdir(notes_outfile.parent):
+                    os.mkdir(notes_outfile.parent)
+
+                np.save(spec_outfile, spec_bins[j,...].astype('float16')) # change to float16 to reduce hard disk memory
+                np.save(notes_outfile, final_notes[j])
+        
+        else:
+            for j in range(len(final_notes)):
+                spec_outfile = prepend_path / processed_list[i].stem / 'spectrograms' / str(math.floor(j/40)) / (str(j) + '.npy')
+                if not os.path.isdir(spec_outfile.parent.parent):
+                    os.mkdir(spec_outfile.parent.parent)
+                if not os.path.isdir(spec_outfile.parent):
+                    os.mkdir(spec_outfile.parent)
+                
+                notes_outfile = prepend_path / processed_list[i].stem / 'notes' / str(math.floor(j/40)) / (str(j) + '.npy') 
+                if not os.path.isdir(notes_outfile.parent.parent):
+                    os.mkdir(notes_outfile.parent.parent)
+                if not os.path.isdir(notes_outfile.parent):
+                    os.mkdir(notes_outfile.parent)
+
+                np.save(spec_outfile, spec_bins[j,...].astype('float16')) # change to float16 to reduce hard disk memory
+                np.save(notes_outfile, final_notes[j])
+
+    return

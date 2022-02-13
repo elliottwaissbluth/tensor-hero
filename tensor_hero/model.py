@@ -2,6 +2,8 @@ import torch
 from torch import nn
 import numpy as np
 import os
+from pathlib import Path
+from tqdm import tqdm
 
 def check_notes_length(notes_path, max_len):
     '''Opens the processed notes array at notes_path and checks whether or not it is larger than max_len
@@ -15,6 +17,106 @@ def check_notes_length(notes_path, max_len):
     '''
     notes_array = np.load(notes_path)
     return notes_array.shape[0] < max_len
+
+def note_dirs_from_spec_dirs(spec_file):
+    '''
+    Finds the note files corresponding to the spectrogram in spec_dir
+    Helper function for ColabLazyDataset __init__()
+
+    ~~~~ ARGUMENTS ~~~~
+    - spec_file (Path): 
+        - single path to a spectrogram in colab transformer training data
+        - assumes file structure defined in tensor_hero/preprocessing/data.py
+            -> preprocess_transformer_data() w/ COLAB=True
+    
+    ~~~~ RETURNS ~~~~
+    Path: Path to notes array corresponding to spec in spec_file
+    '''
+    return Path(str(spec_file).replace('spectrograms', 'notes'))
+    
+    
+class ColabLazyDataset(torch.utils.data.Dataset):
+    '''
+    Inspects the data at partition_path, creates a list (data_paths) and a dictionary (labels) where the list contains
+    paths to spectrogram slices (400ms) and the dictionarty contains path to spectrogram frames and corresponding notes
+    arrays.
+        - data_paths (list of Path): [<path to spectrogram frame> for _  in partition_path]
+        - labels (dict) : [<path to spectrogram frame> : <path to corresponding notes>]
+
+    Lazy loads data, i.e. loads each training example one at a time, as the dataloader is called.
+
+    ~~~~ ARGUMENTS ~~~~
+    - partition_path (Path): should be .../Training Data/Model 1 Training/<train, test, or val>
+    - max_len (int): used for padding, indicates what the length of the notes arrays should be
+    - pad_idx (int): pad index, value the notes tensors will be padded with
+    '''
+    def __init__(self, partition_path, max_src_len, max_trg_len, pad_idx):
+
+        song_paths = [partition_path / x for x in os.listdir(partition_path)]
+        specs_dirs = [x / 'spectrograms' for x in song_paths]
+
+        specs_lists = []
+        for dir_ in specs_dirs:
+            for specs_dir, _, specs in os.walk(dir_):
+                if not specs:
+                    continue
+                specs_lists.append([Path(specs_dir) / spec for spec in specs])
+            
+        specs_lists = [spec for spec_list in specs_lists for spec in spec_list]  # Flatten
+        notes_lists = [note_dirs_from_spec_dirs(x) for x in specs_lists]
+        
+        # Construct dictionary where key:value is <path to spec>:<path to notes array>
+        l = {}  # labels
+        for i in range(len(specs_lists)):
+            l[specs_lists[i]] = notes_lists[i]
+            
+        # Weed out bits of data that exceed the maximum length
+        self.labels = {}
+        self.data_paths = []
+        self.too_long = 0
+        for x in tqdm(specs_lists):
+            if check_notes_length(l[x], max_trg_len):
+                self.data_paths.append(x)
+                self.labels[x] = l[x]
+            else:
+                self.too_long += 1
+        
+        print(f'{self.too_long} datapoints removed due to exceeding maximum length')
+        
+        self.max_trg_len = max_trg_len
+        self.max_src_len = max_src_len
+        self.pad_idx = pad_idx
+
+    def __len__(self):
+        return len(self.data_paths)
+
+    def get_data_dict(self):
+        return self.labels
+
+    def pad_notes(self, notes):
+        '''pads notes with pad_idx to length max_trg_len'''
+        notes = np.pad(notes, 
+                       (0, self.max_trg_len-notes.shape[0]),
+                       'constant',
+                       constant_values=self.pad_idx)
+        return notes
+    
+    def pad_spec(self, spec):
+        '''pads spec with zeros to length max_src_len'''
+        spec = np.pad(spec,
+                      ((0, 0), (0, self.max_src_len-spec.shape[1])),
+                      'constant',
+                      constant_values=0)
+        return spec
+
+    def __getitem__(self, idx):
+        spec = np.load(self.data_paths[idx])
+        spec = self.pad_spec(spec)
+        notes = np.load(self.labels[self.data_paths[idx]])
+        assert notes.shape[0] < self.max_trg_len, 'ERROR: notes array is longer than max_trg_len, (notes length = {}), (max_len = {})'.format(notes.shape[0], self.max_trg_len)
+        notes = self.pad_notes(notes)
+
+        return torch.tensor(spec, dtype=torch.float), torch.tensor(notes)
 
 class LazierDataset(torch.utils.data.Dataset):
     '''
@@ -44,7 +146,7 @@ class LazierDataset(torch.utils.data.Dataset):
         self.labels = {}
         self.data_paths = []
         self.too_long = []
-        for x in dp:
+        for x in tqdm(dp):
             if check_notes_length(l[x], max_trg_len):
                 self.data_paths.append(x)
                 self.labels[x] = l[x]
