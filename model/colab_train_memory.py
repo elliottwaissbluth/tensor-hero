@@ -131,7 +131,7 @@ def main():
             'training_data' : 'train separated',     # CHANGEME (these parameters must be changed each experiment)
             'model_name' : 'model12',                # CHANGEME
             'optimizer' : 'Adam',                    # CHANGEME (maybe not this one, but you do have to fill it in manually)
-            'train_path' : r'/Users/ewaissbluth/Documents/GitHub/tensor-hero/Training_Data/colab_training_data/train',
+            'train_path' : r'X:\Training Data\training_ready\train',
 
             'num_epochs' : 500,
             'batch_size' : 12,
