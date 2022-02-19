@@ -677,3 +677,143 @@ def preprocess_transformer_data(segment_length, training_data_path, train_val_te
                 np.save(notes_outfile, final_notes[j])
 
     return
+
+
+def create_difficulty_dataset(unprocessed_data_path, processed_data_path, REPLACE_NOTES = False,
+                              PRINT_TRACEBACK=True):
+    '''
+    Converts raw downloaded Clone Hero data into processed spectrograms and notes arrays.
+    Populates processed_data_path by processing data in unprocessed_data_path.
+    
+    ~~~~ ARGUMENTS ~~~~
+    - unprocessed_data_path (Path): directory containing track packs of downloaded Clone Hero songs
+    - processed_data_path (Path): empty directory where processed data should be placed
+    - REPLACE_NOTES (bool): if True, will replace any existing notes_arrays and spectrograms in processed
+    
+    ~~~~ RETURNS ~~~~
+    - dict: metadata about processed data
+        - 'wrong_format_charts' (list of Path): list of unprocessed song paths with .chart files in wrong format
+        - 'multiple_audio_songs' (list of Path): list of unprocessed song paths with multiple audio files present
+        - 'processed' (list of Path): list of successfully processed song paths
+        - 'song_size' (float): spectrogram data size in GB
+        - 'notes_size' (float): notes arrays data size in GB
+    '''
+    # Extract songs from sub-packs, if the track pack includes sub-packs
+    sub_packs = __check_for_sub_packs(unprocessed_data_path)
+    __pop_sub_packs(sub_packs)
+
+    wrong_format_charts = []    # Holds paths to charts not in .chart format
+    multiple_audio_songs = []   # Holds paths to charts with multiple audio files
+   
+    for dirName, _, fileList in tqdm(os.walk(unprocessed_data_path)):  # Walk through training data directory
+        if not fileList or fileList in [['.DS_Store'], ['Thumbs.db']]:
+            track_pack_ = Path(dirName).parent.stem
+            continue
+
+        track_pack_ = Path(dirName).parent.stem     # track pack name
+        song_ = Path(dirName).stem                  # song name
+        
+        processed_path = processed_data_path / track_pack_ / song_          # processed song folder
+        unprocessed_path = unprocessed_data_path / track_pack_ / song_      # unprocessed song folder
+
+        audio_file_name = __get_audio_file_name(fileList)
+        unprocessed_song_path = unprocessed_path / audio_file_name
+        
+        if REPLACE_NOTES:
+            if processed_notes_path.exists():
+                os.remove(processed_notes_path)  # Delete because I accidentally saved the same array hundreds of times lol
+
+        # Skip creating the directory if there is more than one audio file
+        # (some songs are divided into guitar.ogg, drums.ogg, etc.)
+        if __check_multiple_audio_files(fileList):
+            multiple_audio_songs.append(unprocessed_song_path)
+            if processed_path.exists():
+                if len(os.listdir(processed_path)) == 0: # If the folder exists but is empty
+                    os.rmdir(processed_path)
+            continue
+
+        # Make folder for directory in 'Processed' if it doesn't already exist
+        if not processed_path.parent.exists():
+            os.mkdir(processed_path.parent)
+        if not processed_path.exists():
+            os.mkdir(processed_path)
+
+        # Check if notes have already been processed
+        # Create note array for song
+        for difficulty in ['ExpertSingle', 'HardSingle', 'MediumSingle', 'EasySingle']:
+            processed_notes_path = processed_path / (difficulty.replace('Single', '') + '.npy')
+            difficulty = '[' + difficulty + ']'
+            try:
+                notes_array = np.array(chart2tensor(unprocessed_path / 'notes.chart', print_release_notes = False, difficulty=difficulty)).astype(int)
+            except TypeError as err:
+                print('{}, {} .chart file is in the wrong format, skipping'.format(track_pack_, song_))
+                if PRINT_TRACEBACK:
+                    print("Type Error: {0}".format(err))
+                    print(traceback.format_exc()) 
+                wrong_format_charts.append(unprocessed_song_path)
+                if processed_path.exists():
+                    # if len(os.listdir(processed_path)) == 0: # If the folder exists but is empty
+                    os.rmdir(processed_path)
+                continue
+            except:
+                print('{}, {} .chart file is in the wrong format, skipping'.format(track_pack_, song_))
+                if PRINT_TRACEBACK:
+                    print('Unknown Error: {0}'.format(sys.exc_info()[0]))
+                    print(traceback.format_exc())
+                wrong_format_charts.append(unprocessed_song_path)
+                if processed_path.exists():
+                    if len(os.listdir(processed_path)) == 0: # If the folder exists but is empty
+                        os.rmdir(processed_path)
+                continue
+        
+            if processed_notes_path.exists():
+                pass
+            else:
+                try:
+                    np.save(processed_notes_path, notes_array)
+                except ValueError as err:
+                    print('Value Error: {0}'.format(err))
+                    print('notes_array shape:', notes_array.shape)
+                    continue
+
+    return
+
+def populate_difficulty_with_simplified_notes(processed_directory):
+    '''
+    Takes all the processed notes arrays (notes.npy) in processed_directory and adds simplified versions 
+    (notes_simplified.npy) to the same subdirectories.
+    
+    Simplified notes are free from modifiers and held notes.
+    
+    ~~~~ ARGUMENTS ~~~~
+    - processed_directory (Path): Path to processed training data directory (probably ./Training Data/Processed)
+    '''
+    
+    # Parse through directory
+    for x in tqdm(os.listdir(processed_directory)):
+        # Check to see if the .DS_Store file is in the directory, skip if so
+        if '.DS_Store' in x:
+            continue
+        
+        for notes_file in ['Expert', 'Hard', 'Medium', 'Easy']:
+            try:
+                notes_array = np.load(processed_directory / x / (notes_file+'.npy'))
+            except FileNotFoundError:
+                print('Error: There is no notes.npy file at {}'.format(str(processed_directory / x)))
+                print('Continuing')
+                continue
+            except NotADirectoryError as err:
+                print('ERROR: {}'.format(err))
+                if str(y) == '.DS_Store':
+                    print('DS_Store error, continuing')
+                    continue
+                else:
+                    break
+
+            new_notes = __remove_release_keys(notes_array)
+            new_notes = __remove_modifiers(new_notes)
+
+            # Save to same directory
+            with open(str(processed_directory / x / (notes_file + '_simplified.npy')), 'wb') as f:
+                np.save(f, new_notes)
+            f.close()
