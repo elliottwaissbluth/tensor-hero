@@ -187,9 +187,8 @@ def main():
 
         max_examples = 1000  # per chunk
         # Define data loaders
-        train_chunks = Chunks(params['train_path'], params['max_trg_len'], max_examples)
-        # train_data = ColabLazyDataset(Path(params['train_path']), params['max_src_len'], params['max_trg_len'], params['pad_idx'])
-        # train_loader = torch.utils.data.DataLoader(train_data, **dl_params)
+        train_data = ColabMemoryDataset(Path(params['train_path']), params['max_src_len'], params['max_trg_len'], max_examples, params['pad_idx'])
+        train_loader = torch.utils.data.DataLoader(train_data, **dl_params)
 
         # ---------------------------------------------------------------------------- #
         #                              TRAINING PARAMETERS                             #
@@ -215,47 +214,38 @@ def main():
         
         model.train() # Put model in training mode, so that it knows it's parameters should be updated
         for epoch in range(num_epochs):
-            for chunk_idx in range(train_chunks.num_chunks):
-                # Construct dataset from chunk
-                print(f'Constructing Chunk {chunk_idx} of epoch {epoch}...')
-                data_paths, labels = train_chunks.get_chunk(chunk_idx)
-                train_data = ColabMemoryDataset(params['max_src_len'], params['max_trg_len'], params['pad_idx'], data_paths, labels)
-                train_loader = torch.utils.data.DataLoader(train_data, **dl_params)
+            for batch_idx, batch in enumerate(train_loader):
+                # Batches come through as a tuple defined in the return statement __getitem__ in the Dataset
+                spec, notes = batch[0].to(device), batch[1].to(device)
 
-                for batch_idx, batch in enumerate(train_loader):
-                    # Batches come through as a tuple defined in the return statement __getitem__ in the Dataset
-                    spec, notes = batch[0].to(device), batch[1].to(device)
+                # forward prop
+                output = model(spec, notes[..., :-1])           # Don't pass the last element into the decoder, want it to be predicted
+                # output = output.reshape(-1, output.shape[2])  # Reshape the output for use by criterion
+                notes = notes[..., 1:] # .reshape(-1)           # Same for the notes
+                optimizer.zero_grad()                           # Zero out the gradient so it doesn't accumulate
 
-                    # forward prop
-                    output = model(spec, notes[..., :-1])           # Don't pass the last element into the decoder, want it to be predicted
-                    # output = output.reshape(-1, output.shape[2])  # Reshape the output for use by criterion
-                    notes = notes[..., 1:] # .reshape(-1)           # Same for the notes
-                    optimizer.zero_grad()                           # Zero out the gradient so it doesn't accumulate
-
-                    loss = criterion(output.permute(0,2,1), notes)  # Calculate loss, this is output vs ground truth
-                    
-                    if batch_idx%25 == 0:
-                        print('\nEpoch {}, Batch {}'.format(epoch+1, batch_idx))
-                        print('Training Loss: {}'.format(loss.item()))
-                    
-                    loss.backward()     # Compute loss for every node in the computation graph
-
-                    # This line to avoid the exploding gradient problem
-                    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1)
-
-                    optimizer.step()    # Update model parameters
-                    params['last_global_step'] += 1
-
-                    # Write to tensorboard
-                    writer.add_scalar("Training Loss", loss, global_step=params['last_global_step'])
-                    # writer.add_hparams(hparam_dict=hparam_dict, metric_dict={'training_loss' : loss}) # NOTE: Move this outside the for loop
-
-                    # if batch_idx%100 == 0:
-                        # print('Ground Truth (sample) : {}'.format(notes[0]))
-                        # print('Canidate (sample)     : {}'.format(torch.argmax(output[0], dim=1)))
+                loss = criterion(output.permute(0,2,1), notes)  # Calculate loss, this is output vs ground truth
                 
-                del train_data, train_loader # Remove training dataset and loader from memory
-            
+                if batch_idx%25 == 0:
+                    print('\nEpoch {}, Batch {}'.format(epoch+1, batch_idx))
+                    print('Training Loss: {}'.format(loss.item()))
+                
+                loss.backward()     # Compute loss for every node in the computation graph
+
+                # This line to avoid the exploding gradient problem
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1)
+
+                optimizer.step()    # Update model parameters
+                params['last_global_step'] += 1
+
+                # Write to tensorboard
+                writer.add_scalar("Training Loss", loss, global_step=params['last_global_step'])
+                # writer.add_hparams(hparam_dict=hparam_dict, metric_dict={'training_loss' : loss}) # NOTE: Move this outside the for loop
+
+                # if batch_idx%100 == 0:
+                    # print('Ground Truth (sample) : {}'.format(notes[0]))
+                    # print('Canidate (sample)     : {}'.format(torch.argmax(output[0], dim=1)))
+                
             # Print training update
             print(f'\nEpoch {epoch+1}/{num_epochs}')
             print(f'Training Loss: {loss.item()}')

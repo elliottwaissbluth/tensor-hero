@@ -44,7 +44,7 @@ class Chunks():
 
     ~~~~ ARGUMENTS ~~~~
     '''
-    def __init__(self, partition_path, max_trg_len, max_examples):
+    def __init__(self, partition_path, max_trg_len, max_examples, CHECK_LENGTH=False):
         song_paths = [partition_path / x for x in os.listdir(partition_path)]
         specs_dirs = [x / 'spectrograms' for x in song_paths]
 
@@ -67,14 +67,19 @@ class Chunks():
         self.labels = {}
         self.data_paths = []
         too_long = 0
-        print('Checking length of spectrograms and notes...')
+        if CHECK_LENGTH:
+            print('Checking length of spectrograms and notes...')
         for x in tqdm(specs_lists):
-            if check_notes_length(l[x], max_trg_len):
+            if CHECK_LENGTH:
+                if check_notes_length(l[x], max_trg_len):
+                    self.data_paths.append(x)
+                    self.labels[x] = l[x]
+                else:
+                    too_long += 1
+            else:
                 self.data_paths.append(x)
                 self.labels[x] = l[x]
-            else:
-                too_long += 1
-        
+                
         print(f'{too_long} datapoints removed due to exceeding maximum length')
 
         self.max_examples = max_examples
