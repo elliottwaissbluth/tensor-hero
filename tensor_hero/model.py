@@ -136,6 +136,123 @@ class ColabMemoryDataset(torch.utils.data.Dataset):
     - pad_idx (int): pad index, value the notes tensors will be padded with
     - max_examples (int): the maximum number of samples per chunk
     '''
+
+    def __init__(self, partition_path, max_src_len, max_trg_len, max_examples, pad_idx, CHECK_LENGTH=False):
+        song_paths = [partition_path / x for x in os.listdir(partition_path)]
+        specs_dirs = [x / 'spectrograms' for x in song_paths]
+
+        specs_lists = []
+        for dir_ in specs_dirs:
+            for specs_dir, _, specs in os.walk(dir_):
+                if not specs:
+                    continue
+                specs_lists.append([Path(specs_dir) / spec for spec in specs])
+            
+        specs_lists = [spec for spec_list in specs_lists for spec in spec_list]  # Flatten
+        notes_lists = [note_dirs_from_spec_dirs(x) for x in specs_lists]
+        
+        # Construct dictionary where key:value is <path to spec>:<path to notes array>
+        l = {}  # labels
+        for i in range(len(specs_lists)):
+            l[specs_lists[i]] = notes_lists[i]
+            
+        # Weed out bits of data that exceed the maximum length
+        self.labels = {}
+        self.data_paths = []
+        too_long = 0
+        if CHECK_LENGTH:
+            print('Checking length of spectrograms and notes...')
+        for x in tqdm(specs_lists):
+            if CHECK_LENGTH:
+                if check_notes_length(l[x], max_trg_len):
+                    self.data_paths.append(x)
+                    self.labels[x] = l[x]
+                else:
+                    too_long += 1
+            else:
+                self.data_paths.append(x)
+                self.labels[x] = l[x]
+                
+        print(f'{too_long} datapoints removed due to exceeding maximum length')
+
+        self.max_examples = max_examples
+        self.num_samples = len(self.labels)  # This could be lower than max_samples
+        
+        self.max_trg_len = max_trg_len
+        self.max_src_len = max_src_len
+        self.pad_idx = pad_idx
+
+        del too_long, l, song_paths, specs_dirs, specs_lists, notes_lists
+        
+        spec = np.load(self.data_paths[0])
+        notes = np.load(self.labels[self.data_paths[0]])
+
+        # Create and empty data matrix
+        # Shape for self.specs = [max_examples, 512, max_src_len]
+        # Shape for self.notes = [max_examples, max_trg_len]
+        self.specs = np.empty(shape=(self.num_samples, spec.shape[0], max_src_len))
+        self.notes = np.empty(shape=(self.num_samples, max_trg_len))
+        
+        self.num_samples = len(self.data_paths) 
+        for idx in tqdm(range(self.num_samples)):
+            spec = self.pad_spec(np.load(self.data_paths[idx]))
+            notes = self.pad_notes(np.load(self.labels[self.data_paths[idx]]))
+            self.specs[idx,...] = spec
+            self.notes[idx,...] = notes
+        print(f'self.specs is taking up {sys.getsizeof(self.specs) / (1024**2):.2f} MB')
+        print(f'self.notes is taking up {sys.getsizeof(self.notes) / (1024**2):.2f} MB')
+        del spec, notes
+        
+    def __len__(self):
+        return self.num_samples
+
+    def pad_notes(self, notes):
+        '''pads notes with pad_idx to length max_trg_len'''
+        notes = np.pad(notes, 
+                       (0, self.max_trg_len-notes.shape[0]),
+                       'constant',
+                       constant_values=self.pad_idx)
+        return notes
+    
+    def pad_spec(self, spec):
+        '''pads spec with zeros to length max_src_len'''
+        spec = np.pad(spec,
+                      ((0, 0), (0, self.max_src_len-spec.shape[1])),
+                      'constant',
+                      constant_values=0)
+        return spec
+
+    def __getitem__(self, idx):
+        return torch.tensor(self.specs[idx], dtype=torch.float), torch.tensor(self.notes[idx], dtype=torch.long)
+
+class ColabChunksDataset(torch.utils.data.Dataset):
+    '''
+    Inspects the data at partition_path, creates a list (data_paths) and a dictionary (labels) where the list contains
+    paths to spectrogram slices (400ms) and the dictionarty contains path to spectrogram frames and corresponding notes
+    arrays.
+        - data_paths (list of Path): [<path to spectrogram frame> for _  in partition_path]
+        - labels (dict) : [<path to spectrogram frame> : <path to corresponding notes>]
+
+    Loads as many of these features into an array, self.specs and self.notes, as allowed by max_examples. max_examples should be
+    chosen to be as large as possible without overloading RAM.
+
+    One possible way to go about training with limited max_data_size:
+    
+    for epoch in num_epochs:
+        for chunk in num_chunks: (where num_chunks is ceil([total num examples] / [max_examples]))
+            <load chunk into dataloader>
+            for idx, batch in dataloader:
+                <train>
+            <delete chunk from memory>
+            <initialize next chunk>
+
+    ~~~~ ARGUMENTS ~~~~
+    - partition_path (Path): should be .../Training Data/Model 1 Training/<train, test, or val>
+    - max_src_len (int): used for padding spectrograms, indicates what the length of the spectrograms should be in the time dimension
+    - max_trg_len (int): used for padding notes, indicates what the length of the notes arrays should be
+    - pad_idx (int): pad index, value the notes tensors will be padded with
+    - max_examples (int): the maximum number of samples per chunk
+    '''
     def __init__(self, max_src_len, max_trg_len, pad_idx, data_paths, labels):
 
         self.max_trg_len = max_trg_len
