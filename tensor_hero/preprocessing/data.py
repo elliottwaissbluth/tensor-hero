@@ -262,7 +262,7 @@ def populate_processed_folder(unprocessed_data_path, processed_data_path, REPLAC
 
     return data_info
 
-def get_list_of_ogg_files(unprocessed_path):
+def get_list_of_ogg_files(unprocessed_path, prefix = None):
     '''
     Takes the root directory (unprocessed_path) and returns a list of the full file paths
     to all the .ogg files in that directory, provided there is only one audio file per folder (i.e. it
@@ -274,6 +274,7 @@ def get_list_of_ogg_files(unprocessed_path):
 
     ~~~~ ARGUMENTS ~~~~
     -   unprocessed_path (Path): path object or string to root unprocessed folder. probably ./Training Data/Unprocessed
+    -   prefix (str or None): if string, will look for a specific prefix on the .ogg (e.g. "separated.ogg")
 
     ~~~~ RETURNS ~~~~
     -   ogg_file_paths (list of Path): list of paths to all .ogg files in unprocessed_path
@@ -289,13 +290,19 @@ def get_list_of_ogg_files(unprocessed_path):
         for song_dir in [track_pack / y for y in os.listdir(track_pack)]:
             if 'DS_Store' in str(song_dir):
                 continue
-            if __check_multiple_audio_files(os.listdir(song_dir)): # Check for multiple audio files
-                continue
+            if prefix is None:
+                if __check_multiple_audio_files(os.listdir(song_dir)): # Check for multiple audio files
+                    continue
             else:
                 for f in os.listdir(song_dir):
                     if f.endswith('.ogg'):
-                        ogg_file_paths.append(song_dir / f)
-                        processed_paths.append(Path(str(song_dir).replace('Unprocessed', 'Processed', 1)))
+                        if prefix is not None:
+                            if f.startswith(prefix):
+                                ogg_file_paths.append(song_dir / f)
+                                processed_paths.append(Path(str(song_dir).replace('Unprocessed', 'Processed', 1)))
+                        else:
+                            ogg_file_paths.append(song_dir / f)
+                            processed_paths.append(Path(str(song_dir).replace('Unprocessed', 'Processed', 1)))
                         
     return ogg_file_paths, processed_paths
 
@@ -505,7 +512,7 @@ def __prepare_notes_tensor(notes):
     notes = __formatted_notes_to_indices(notes)
     return notes
 
-def preprocess_transformer_data(segment_length, training_data_path, train_val_test_probs, model_training_directory_name, COLAB=False):
+def preprocess_transformer_data(segment_length, training_data_path, train_val_test_probs, model_training_directory_name, COLAB=False, SEPARATED=True):
     '''
     Takes a directory of processed song level training data and slices each song into 4 second segments.
     Processed folder should already exist with simplified notes
@@ -561,6 +568,8 @@ def preprocess_transformer_data(segment_length, training_data_path, train_val_te
     - COLAB (bool): 
         - If True, segments training data so folders do not exceed 40 total files
         - This is necessary because COLAB does not work well with directories with large numbers of files
+    - SEPARATED (bool):
+        - If True, will seek out separated spectrograms (spectrogram_separated.npy) instead of unseparated ones
     '''
     assert sum(train_val_test_probs) == 1, 'ERROR: train_val_test_probs does not sum to 1'
     
@@ -583,19 +592,17 @@ def preprocess_transformer_data(segment_length, training_data_path, train_val_te
         os.mkdir(test_path)
         print(f'made directory {str(test_path)}')
         
-    _, processed_list = get_list_of_ogg_files(unprocessed_path)
-
+    if not SEPARATED:
+        _, processed_list = get_list_of_ogg_files(unprocessed_path)
+    else:
+        _, processed_list = get_list_of_ogg_files(unprocessed_path, prefix='separated')
+    
     # Get paths of notes and corresponding paths of spectrograms
-    spec_paths = [song / 'spectrogram.npy' for song in processed_list]
+    if not SEPARATED:
+        spec_paths = [song / 'spectrogram.npy' for song in processed_list]
+    else:
+        spec_paths = [song / 'spectrogram_separated.npy' for song in processed_list]
     notes_paths = [song / 'notes_simplified.npy' for song in processed_list]
-
-
-    # Used to create the outfile names of the saved slices
-    # Will also be able to use these in conjunction with "train_key", "test_key", and "val_key"
-    # to determine which indices go to which song
-    train_count = 0
-    val_count = 0
-    test_count = 0
 
     for i in tqdm(range(len(processed_list))):
         # Process spectrogram
@@ -616,7 +623,11 @@ def preprocess_transformer_data(segment_length, training_data_path, train_val_te
         except FileNotFoundError:
             print('There is no notes_simplified at {}'.format(notes_paths[i]))
             continue
-
+        
+        # print(f'notes shape: {notes.shape}')
+        # print(f'spec shape: {spec.shape}')
+        if notes.shape[0] != spec.shape[1]:  #TODO: FIXME
+            continue
         assert notes.shape[0] == spec.shape[1], 'ERROR: Spectrogram and notes shape do not match'
         
         # Get number of segment_length second slices
@@ -663,7 +674,11 @@ def preprocess_transformer_data(segment_length, training_data_path, train_val_te
             for j in range(len(final_notes)):
                 spec_outfile = prepend_path / processed_list[i].stem / 'spectrograms' / str(math.floor(j/40)) / (str(j) + '.npy')
                 if not os.path.isdir(spec_outfile.parent.parent):
-                    os.mkdir(spec_outfile.parent.parent)
+                    try:
+                        os.mkdir(spec_outfile.parent.parent)
+                    except:
+                        print(f'Can\'t locate directory {spec_outfile.parent}, continuing...')
+                        break
                 if not os.path.isdir(spec_outfile.parent):
                     os.mkdir(spec_outfile.parent)
                 
