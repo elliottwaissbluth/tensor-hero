@@ -66,9 +66,9 @@ def calculate_loss(truth_tensor,preds_tensor,weights = weights_matrix()):
 
     ~~~~ ARGUMENTS ~~~~
     - truth_tensor : true notes
-        - torch.Size([12, 499])
+        - torch.Size([batch_size, 499])
     - preds_tensor : prediction output from batch
-        - torch.Size([12, 499, 435])
+        - torch.Size([batch_size, 499, 435])
 
     ~~~~ RETURNS ~~~~
     - single loss value
