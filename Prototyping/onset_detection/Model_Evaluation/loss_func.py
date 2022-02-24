@@ -60,9 +60,9 @@ def weights_matrix(time_note_weight = 1.5, open_weight = 1, weights = [1.2,1.3,1
     return w
 
 
-def calculate_loss(truth_tensor,preds_tensor,weights = weights_matrix()):
+def prediction_probability_weighted_loss(truth_tensor,preds_tensor,weights = weights_matrix()):
     """
-    #returns  penalty for total loss in prediction
+    #returns  penalty for total loss in prediction according to defined weights matrix against probabilies predicted by model
 
     ~~~~ ARGUMENTS ~~~~
     - truth_tensor : true notes
@@ -76,15 +76,19 @@ def calculate_loss(truth_tensor,preds_tensor,weights = weights_matrix()):
     #create one-hot of truth values
     truth_one_hot = torch.nn.functional.one_hot(truth_tensor, num_classes= -1)
     
+    #normalize prediction weights
+    preds_tensor_norm = torch.nn.functional.normalize(preds_tensor, p=1, dim=2)
+
+
     #subtract guesses from truth
-    incorrectness = truth_one_hot - preds_tensor
+    incorrectness = truth_one_hot - preds_tensor_norm
 
     #construct weight matrix for true values
     weight_matrix = weights[truth_tensor,:]
     weight_matrix = torch.tensor(weight_matrix)
 
     #multiply weight matrix by incorrectness, take absolute value for total loss 
-    loss = abs(torch.mul(weight_matrix,incorrectness))
+    loss = torch.abs(torch.mul(weight_matrix,incorrectness))
     loss_avg = torch.mean(loss)
     
     return loss_avg
