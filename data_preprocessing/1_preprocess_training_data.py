@@ -1,3 +1,7 @@
+'''
+Takes raw, unprocessed data and processes expert .chart files into a specified processed folder
+'''
+
 # To process the training data, we will use the populated_processed_folder()
 from pathlib import Path
 import sys

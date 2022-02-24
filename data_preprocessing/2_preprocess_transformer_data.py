@@ -1,3 +1,8 @@
+'''
+Once 1_preprocess_training_data.py has been run, this script will further process the data
+to be ready for the transformer model.
+'''
+
 import sys
 from pathlib import Path
 sys.path.insert(1, str(Path.cwd()))

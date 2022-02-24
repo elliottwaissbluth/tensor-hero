@@ -29,3 +29,4 @@ Shared_Functionality/Preprocessing/Prototypes/note simplification/test/1. Joe Sa
 colab_ogg_key_dict.pkl
 **/runs
 !long_train.pt
+!model13.pt
