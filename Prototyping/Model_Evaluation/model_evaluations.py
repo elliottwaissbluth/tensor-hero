@@ -29,7 +29,9 @@ def evaluate_model_run(predicted_notes_batch, true_notes_batch ):
 
     
     ~~~~ RETURNS ~~~~
+    TODO : Specify what each dataframe includes, and how it's calculated
     - Dictionary of various dataframes with model performance information
+
     """
     #dictionary for function return
     model_run_metrics = {}

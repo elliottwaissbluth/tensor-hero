@@ -4,10 +4,10 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 
-def freq_saturation(truth,output):
+def freq_saturation(truth, output):
     """
-    #provides saturation value - how many total notes did our model predict
-    #requires notes array be of value 0-32
+    provides saturation value - how many total notes did our model predict
+    requires notes array be of value 0-32
 
     ~~~~ ARGUMENTS ~~~~
     - truth : np.array
@@ -30,8 +30,8 @@ def freq_saturation(truth,output):
 
 def freq_histogram(truth, output):
     """
-    #returns plotted histogram of distribution of notes 0-32
-    #requires notes array be of value 0-32
+    returns plotted histogram of distribution of notes 0-32
+    requires notes array be of value 0-32
 
     ~~~~ ARGUMENTS ~~~~
     - truth : np.array
