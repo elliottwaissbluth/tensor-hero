@@ -5,8 +5,8 @@ sys.path.insert(1, str(Path.cwd()))
 import os
 from tensor_hero.preprocessing.data import create_difficulty_dataset, populate_difficulty_with_simplified_notes
 
-unprocessed_path = Path.cwd() / 'Training_Data' / 'Guitar_Hero_X'
-processed_path = Path.cwd() / 'Training_Data' / 'difficulty_dataset'
+unprocessed_path = Path.cwd() / 'Training_Data' / 'jackie_charts_ext'
+processed_path = Path.cwd() / 'Training_Data' / 'difficulty_dataset' / 'jackie_charts'
 
 # assert (os.path.isdir(unprocessed_path) and os.path.isdir(processed_path)), 'ERROR: Place "Training Data" folder in this directory'
 
