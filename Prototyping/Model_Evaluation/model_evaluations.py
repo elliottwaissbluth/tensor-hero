@@ -12,28 +12,31 @@ from model_metric_functions import *
 from mir_eval_function_onset_conversion import *
 
 # def evaluate_model_run(pred_notes_path_list, true_notes_path_list ):
-def evaluate_model_run(predicted_notes_batch, true_notes_batch ):
+def evaluate_model_run(predicted_notes_tensor_batch, true_notes_tensor_batch ):
     """
-    #returns  dictionary of dataframes
-    #dataframes include: Frequency Notes, Frequency Note Types, Model Metrics
+    returns  dictionary of dataframes
+    dataframes include: Frequency Notes, Frequency Note Types, Model Metrics
 
     ~~~~ ARGUMENTS ~~~~
-    - truth : batch of np.array
-        - should be values 0-32 notes array
-        - true note values
-        - each array is member of batch input for training, should be 400 long
-    - output : prediction batch of np.array
-        - should be values 0-32 notes array
-        - predicted note values
-        - each array is member of batch output after training, should be 400 long
-
+    - preds_tensor : prediction batch output
+        - torch.Size([batch_size, 499, 435])
+    - truth_tensor : true notes
+        - torch.Size([batch_size, 499])
     
     ~~~~ RETURNS ~~~~
     - Dictionary of various dataframes with model performance information
+        1. Frequency Table (% for each note value of total notes)
+        2. Frequency Type Table (% for each type type of total notes)
+        3. Metrics Table ('Saturation', 'F1', 'Precision', 'Recall') 
     """
     #dictionary for function return
     model_run_metrics = {}
  
+    #convert tensor format to np arrays for both candidate tensor output, and truth tensor
+    predicted_notes_batch = predicted_notes_tensor_batch[:,:,0]
+    predicted_notes_batch = predicted_notes_batch.cpu().detach().numpy()
+
+    true_notes_batch = true_notes_tensor_batch.cpu().detach().numpy()
 
     #create placeholder metric objects
     freq_saturation_arr = np.zeros(shape=(len(predicted_notes_batch), 1))
