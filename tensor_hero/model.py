@@ -209,7 +209,7 @@ class ColabMemoryDataset(torch.utils.data.Dataset):
     -   partition_path (Path): should be .../Training Data/Model 1 Training/<train, test, or val>
     -   max_src_len (int): used for padding spectrograms, indicates what the length of the spectrograms should be in the time dimension
     -   max_trg_len (int): used for padding notes, indicates what the length of the notes arrays should be
-    -   max_examples (int): the maximum number of samples per chunk
+    -   max_examples (int): the maximum number of samples per chunk. If set to -1, uses whole dataset
     -   pad_idx (int): pad index, value the notes tensors will be padded with
     -   CHECK_LENGTH (bool): if True, will check each notes training example against max_trg_len to make sure there are no notes that
                              exceed this length. If one of these notes exists, it will trigger CUDA device side asset
@@ -252,8 +252,8 @@ class ColabMemoryDataset(torch.utils.data.Dataset):
             self.labels = l
             print('Notes were not checked against max_trg_len')
                 
-        self.max_examples = max_examples
         self.num_samples = len(self.labels)  # This could be lower than max_samples
+        self.max_examples = max_examples if max_examples > 0 else self.num_samples
         self.max_trg_len = max_trg_len
         self.max_src_len = max_src_len
         self.pad_idx = pad_idx
