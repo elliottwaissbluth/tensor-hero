@@ -699,8 +699,8 @@ def create_difficulty_dataset(unprocessed_data_path, processed_data_path, REPLAC
         - 'notes_size' (float): notes arrays data size in GB
     '''
     # Extract songs from sub-packs, if the track pack includes sub-packs
-    sub_packs = __check_for_sub_packs(unprocessed_data_path)
-    __pop_sub_packs(sub_packs)
+    # sub_packs = __check_for_sub_packs(unprocessed_data_path)
+    # __pop_sub_packs(sub_packs)
 
     wrong_format_charts = []    # Holds paths to charts not in .chart format
     multiple_audio_songs = []   # Holds paths to charts with multiple audio files
