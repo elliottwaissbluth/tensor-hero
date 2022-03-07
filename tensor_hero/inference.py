@@ -57,6 +57,15 @@ notes_to_chart_strings = {
     32 : ['7']
 }
 
+def transformer_output_to_notes_array(output):
+    '''
+    Takes transformer output and converts to notes array
+    
+    Differs from m1_tensor_to_note_array() because it
+        - can handle batches of tensors and will return batches of notes arrays
+        - removes EOS and
+    '''
+
 def m1_tensor_to_note_array(output, PRINT=False):
     '''
     m1 tensors are returned from model 1.
