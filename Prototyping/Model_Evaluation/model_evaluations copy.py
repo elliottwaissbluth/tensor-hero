@@ -2,14 +2,13 @@ import numpy as np
 import pandas as pd
 import sys
 sys.path.insert(1, r'/Users/scarr/MIMS/tensor-hero/Prototyping/onset_detection/Model_Evaluation')
-from tensor_hero.inference import m1_tensor_to_note_array
 # from elliotts computer
 #  sys.path.insert(1, r'C:\Users\ewais\Documents\GitHub\tensor-hero\Shared_Functionality\Model_Evaluation')
 from model_metric_functions import freq_saturation, freq_table, freq_type_table
 from mir_eval_function_onset_conversion import notes_to_onset, eval_fmeas_precision_recall
 
 # def evaluate_model_run(pred_notes_path_list, true_notes_path_list ):
-def evaluate_model_run(predicted_notes_batch, true_notes_batch ):
+def evaluate_model_run(predicted_notes_tensor_batch, true_notes_tensor_batch ):
     """
     returns  dictionary of dataframes
     dataframes include: Frequency Notes, Frequency Note Types, Model Metrics
@@ -20,7 +19,8 @@ def evaluate_model_run(predicted_notes_batch, true_notes_batch ):
     - truth_tensor : true notes
         - torch.Size([batch_size, 499])
     
-    ~~~~ RETURNS ~~~
+    ~~~~ RETURNS ~~~~
+    - Dictionary of various dataframes with model performance information
         1. Frequency Table (% for each note value of total notes)
         2. Frequency Type Table (% for each type type of total notes)
         3. Metrics Table ('Saturation', 'F1', 'Precision', 'Recall') 
@@ -29,31 +29,25 @@ def evaluate_model_run(predicted_notes_batch, true_notes_batch ):
     model_run_metrics = {}
  
     #convert tensor format to np arrays for both candidate tensor output, and truth tensor
-    pred_notes_arrays = []
-    true_notes_arrays = []
-    batch_size = predicted_notes_batch.shape[0]
-    
-    for i in range(batch_size):
-        pred_notes_arrays.append(m1_tensor_to_note_array(predicted_notes_batch[i,...]))
-        true_notes_arrays.append(m1_tensor_to_note_array(true_notes_batch[i,...]))
+    predicted_notes_batch = predicted_notes_tensor_batch[:,:,0]
+    predicted_notes_batch = predicted_notes_batch.cpu().detach().numpy()
+
+    true_notes_batch = true_notes_tensor_batch.cpu().detach().numpy()
 
     #create placeholder metric objects
-    freq_saturation_arr = np.zeros(shape=(batch_size, 1))
-    freq_table_arr = np.zeros(((batch_size, 33, 4)))
-    freq_type_table_arr = np.zeros(((batch_size, 7 , 4)))
-    f1_arr = np.zeros(shape=(batch_size, 1))
-    precision_arr = np.zeros(shape=(1, batch_size))
-    recall_arr = np.zeros(shape=(1, batch_size))
+    freq_saturation_arr = np.zeros(shape=(len(predicted_notes_batch), 1))
+    freq_table_arr = np.zeros(((len(predicted_notes_batch), 33, 4)))
+    freq_type_table_arr = np.zeros(((len(predicted_notes_batch), 7 , 4)))
+    f1_arr = np.zeros(shape=(len(predicted_notes_batch), 1))
+    precision_arr = np.zeros(shape=(1, len(predicted_notes_batch)))
+    recall_arr = np.zeros(shape=(1, len(predicted_notes_batch)))
 
-    print(f'pred_notes_arrays: {pred_notes_arrays}')
-    print(f'batch_size : {batch_size}')
-    print(f'predicted_notes_batch.shape: {predicted_notes_batch.shape}')
 
     # Iterate through each predicted index of training batch, get metrics against true notes values
     for i in range(len(predicted_notes_batch)):
         # Get true & predicted notes arrays for given song
-        temp_pred_notes = pred_notes_arrays[i]
-        temp_true_notes = true_notes_arrays[i]
+        temp_pred_notes = predicted_notes_batch[i]
+        temp_true_notes = true_notes_batch[i]
 
         # Convert our arrays to format required for mir_eval functions
         temp_pred_onset = notes_to_onset(note_array=temp_pred_notes)
