@@ -109,9 +109,13 @@ def transformer_output_to_notes_array(output, PROBABILITIES=True):
     -   notes_arrays (Numpy Array, shape = (<batch_size>, 400)):
             - A batch of notes arrays corresponding to the input batch of transformer output
     '''
+    
     output = output.detach().cpu().numpy()   # detach from computation graph, convert to numpy
     if PROBABILITIES:   # If the output has an extra dimension for probabilities
+        assert len(list(output.shape)) == 3
         output = np.argmax(output, axis=-1)      # go from probabilities to index predictions
+    else:
+        assert len(list(output.shape)) == 2
     
     # Initialize matrix of notes arrays
     notes_arrays = np.empty(shape=(output.shape[0], 400))

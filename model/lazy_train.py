@@ -1,6 +1,8 @@
 from pathlib import Path
 import sys
 sys.path.insert(1, str(Path.cwd()))
+from tensor_hero.inference import transformer_output_to_notes_array
+from tensor_hero.metrics import evaluate_model_run
 from tensor_hero.model import Transformer, LazierDataset
 import torch
 from torch import nn
@@ -131,7 +133,7 @@ def main():
             'training_data' : 'train separated',     # CHANGEME (these parameters must be changed each experiment)
             'model_name' : 'model12',                # CHANGEME
             'optimizer' : 'Adam',                    # CHANGEME (maybe not this one, but you do have to fill it in manually)
-            'train_path' : r'X:\Training Data\Model 1 Training Separated\train',
+            'train_path' : r'X:\Training Data\separated_colab\train',
 
             'num_epochs' : 500,
             'batch_size' : 12,
@@ -231,6 +233,7 @@ def main():
                 if batch_idx%25 == 0:
                     print('\nEpoch {}, Batch {}'.format(epoch+1, batch_idx))
                     print('Training Loss: {}'.format(loss.item()))
+                    
                 
                 loss.backward()     # Compute loss for every node in the computation graph
 

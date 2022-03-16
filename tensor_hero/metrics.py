@@ -25,7 +25,13 @@ def freq_saturation(truth,output):
     """
     truth_nonzero = np.count_nonzero(truth)
     output_nonzero = np.count_nonzero(output)
-    return output_nonzero/truth_nonzero
+    if truth_nonzero:
+        return output_nonzero/truth_nonzero
+    else:
+        if output_nonzero:
+            return 3
+        else:
+            return 1
 
 def freq_histogram(truth, output):
     """

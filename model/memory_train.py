@@ -1,6 +1,8 @@
 from pathlib import Path
 import sys
 sys.path.insert(1, str(Path.cwd()))
+from tensor_hero.inference import transformer_output_to_notes_array
+from tensor_hero.metrics import evaluate_model_run
 from tensor_hero.model import ColabMemoryDataset, Transformer
 import torch
 from torch import nn
@@ -10,6 +12,7 @@ from datetime import datetime
 import os
 import json
 import pickle
+import pandas as pd
 
 def __load_model(model_directory):
     '''
@@ -148,8 +151,8 @@ def main():
 
             'lr' : 1e-4,
             'num_heads' : 8,
-            'num_encoder_layers' : 4,
-            'num_decoder_layers' : 4,
+            'num_encoder_layers' : 2,
+            'num_decoder_layers' : 2,
             'dropout' : 0.1,
             'forward_expansion' : 4,
 
@@ -185,7 +188,7 @@ def main():
             'drop_last' : params['drop_last'],
         }
 
-        max_examples = 10000
+        max_examples = 1000
         
         # Define data loaders
         train_data = ColabMemoryDataset(Path(params['train_path']), 
@@ -236,6 +239,13 @@ def main():
                 if batch_idx%25 == 0:
                     print('\nEpoch {}, Batch {}'.format(epoch+1, batch_idx))
                     print('Training Loss: {}'.format(loss.item()))
+                    
+                    # Only take the metrics every 25 batches
+                    metrics_dfs = evaluate_model_run(output, notes)
+                    onset_saturation = metrics_dfs['Metric Values']['Saturation']['average']
+                    onset_f1 = metrics_dfs['Metric Values']['F1']['average']
+                    writer.add_scalar('Training Onset Saturation', onset_saturation, global_step=params['last_global_step'])
+                    writer.add_scalar('Training Onset F1', onset_f1, global_step=params['last_global_step'])
                 
                 loss.backward()     # Compute loss for every node in the computation graph
 
