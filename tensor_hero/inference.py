@@ -57,6 +57,74 @@ notes_to_chart_strings = {
     32 : ['7']
 }
 
+def __single_prediction_to_notes_array(prediction):
+    '''
+    Takes a single prediction from the transformer and translates it to a notes array
+    of length 400.
+
+    ~~~~ ARGUMENTS ~~~~
+    -   prediction (Numpy Array, shape=(<max_trg_len>,)):
+            -   Prediction from the transformer, should be a single list of max indices
+                from transformer prediction. Expected to be in (time, note, time, note, etc.)
+                format.
+        
+    ~~~~ RETURNS ~~~~
+    -   notes_array (Numpy Array, shape = (400,)):
+            -   The prediction translated into a 4 second simplified notes array
+    '''
+    note_vals = list(range(32))     # Values of output array corresponding to notes
+    time_vals = list(range(32,432)) # Corresponding to times
+
+    # Loop through the array two elements at a time
+    pairs = []
+    for i in range(prediction.shape[0]-1):
+        pair = (prediction[i], prediction[i+1]) # Take predicted notes as couples
+        if pair[0] in time_vals and pair[1] in note_vals:
+            pairs.append(pair)  # Append if pair follows (time, note) pattern
+
+    # Create notes array
+    notes_array = np.zeros(400)
+    for pair in pairs:
+        notes_array[pair[0]-32] = pair[1]
+    return notes_array
+
+def transformer_output_to_notes_array(output, PROBABILITIES=True):
+    '''
+    Takes a batch of output or input to the transformer and converts it to notes arrays.
+    Converts the "model 1 data" as described in ./Documentation/'format of model 1 data.txt'
+    Returns a matrix of notes arrays, the 0th dimension corresponding to the batch dimension
+    of output
+
+    ~~~~ ARGUMENTS ~~~~
+    -   output (Torch Tensor, shape=[<batch_size>, <max_trg_len-1>, 435]):
+            - Can either be the raw output from the transformer or the ground truth input
+            - The difference between GT input and output is that GT input does not need to be
+            collapsed along the probability dimension. If GT input, set PROBABILITES=True
+    
+    -   PROBABILITIES (bool, optional):
+            - True if raw transformer output, False if ground truth transformer input 
+            - If True, assumes that output has a probability dimension
+
+    ~~~~ RETURNS ~~~~
+    -   notes_arrays (Numpy Array, shape = (<batch_size>, 400)):
+            - A batch of notes arrays corresponding to the input batch of transformer output
+    '''
+    
+    output = output.detach().cpu().numpy()   # detach from computation graph, convert to numpy
+    if PROBABILITIES:   # If the output has an extra dimension for probabilities
+        assert len(list(output.shape)) == 3
+        output = np.argmax(output, axis=-1)      # go from probabilities to index predictions
+    else:
+        assert len(list(output.shape)) == 2
+    
+    # Initialize matrix of notes arrays
+    notes_arrays = np.empty(shape=(output.shape[0], 400))
+    for idx in range(output.shape[0]):      # Each element of the batch gets computed individually
+        prediction = np.delete(output[idx], np.where(output[idx] >= 432))  # delete <sos>, <eos>, <pad>
+        notes_arrays[idx] = __single_prediction_to_notes_array(prediction)
+
+    return  notes_arrays
+
 def m1_tensor_to_note_array(output, PRINT=False):
     '''
     m1 tensors are returned from model 1.
@@ -71,6 +139,7 @@ def m1_tensor_to_note_array(output, PRINT=False):
     -   shape = (<song length in seconds * 100>,)
     -   indices represent time in 10ms bins, values represent notes
     '''
+    output = torch.argmax(output, dim=1)
     output = output.detach().cpu().numpy()
     # Remove padding, <sos>, <pad>
     output = np.delete(output, np.where(output == 432)) # <sos>
@@ -191,7 +260,7 @@ def predict(model, device, input, sos_idx, max_len):
             # print(prediction)
             # break
     
-    return prediction
+    return prediction, output
 
 def write_song_from_notes_array(song_metadata, notes_array, outfolder):
     '''
@@ -233,7 +302,8 @@ def write_song_from_notes_array(song_metadata, notes_array, outfolder):
     f.close()
         
 
-def full_song_prediction(song_path, model, device, sos_idx, max_len, song_metadata, outfolder, PRINT=False):
+def full_song_prediction(song_path, model, device, sos_idx, max_len, song_metadata, outfolder, 
+                         PRINT=False, RETURN_RAW_OUTPUT=False):
     '''
     Reads the song at song_path, uses model to predict notes over time, saves .chart to outfolder
     and copies song there as well. This outfolder can then be dropped into Clone Hero's song dir.
@@ -271,7 +341,7 @@ def full_song_prediction(song_path, model, device, sos_idx, max_len, song_metada
     notes_array = np.zeros(full_spec.shape[0]*full_spec.shape[2])
     for i in range(full_spec.shape[0]):
         print(f'predicting segment {i}/{full_spec.shape[0]}')
-        prediction = predict(model, device, full_spec[i,...], sos_idx, max_len)
+        prediction, raw_output = predict(model, device, full_spec[i,...], sos_idx, max_len)
         if PRINT:
             print('m1 notes tensor: {}'.format(prediction))
         notes_array[(i*full_spec.shape[2]):((i+1)*full_spec.shape[2])] = m1_tensor_to_note_array(prediction)
@@ -283,7 +353,10 @@ def full_song_prediction(song_path, model, device, sos_idx, max_len, song_metada
     write_song_from_notes_array(song_metadata, notes_array, outfolder)
     # Copy the audio file into the outfolder
     shutil.copyfile(str(song_path), str(outfolder / 'song.ogg'))
-    return notes_array
+    if not RETURN_RAW_OUTPUT:
+        return notes_array
+    if RETURN_RAW_OUTPUT:
+        return notes_array, raw_output
 
 if __name__ == '__main__':
 

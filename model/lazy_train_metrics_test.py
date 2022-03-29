@@ -1,9 +1,7 @@
 from pathlib import Path
 import sys
 sys.path.insert(1, str(Path.cwd()))
-from tensor_hero.inference import transformer_output_to_notes_array
-from tensor_hero.metrics import evaluate_model_run
-from tensor_hero.model import ColabMemoryDataset, Transformer
+from tensor_hero.model import Transformer, LazierDataset
 import torch
 from torch import nn
 from torch import optim
@@ -12,7 +10,6 @@ from datetime import datetime
 import os
 import json
 import pickle
-import pandas as pd
 
 def __load_model(model_directory):
     '''
@@ -134,12 +131,12 @@ def main():
             'training_data' : 'train separated',     # CHANGEME (these parameters must be changed each experiment)
             'model_name' : 'model12',                # CHANGEME
             'optimizer' : 'Adam',                    # CHANGEME (maybe not this one, but you do have to fill it in manually)
-            'train_path' : r'X:\Training Data\separated_colab\train',
+            'train_path' : r'X:\Training Data\Model 1 Training Separated\train',
 
             'num_epochs' : 500,
             'batch_size' : 12,
             'shuffle' : True,
-            'num_workers' : 0,
+            'num_workers' : 4,
             'drop_last' : True,
             'last_global_step' : 0,
 
@@ -151,8 +148,8 @@ def main():
 
             'lr' : 1e-4,
             'num_heads' : 8,
-            'num_encoder_layers' : 2,
-            'num_decoder_layers' : 2,
+            'num_encoder_layers' : 4,
+            'num_decoder_layers' : 4,
             'dropout' : 0.1,
             'forward_expansion' : 4,
 
@@ -188,15 +185,8 @@ def main():
             'drop_last' : params['drop_last'],
         }
 
-        max_examples = 1000
-        
         # Define data loaders
-        train_data = ColabMemoryDataset(Path(params['train_path']), 
-                                        params['max_src_len'], 
-                                        params['max_trg_len'],
-                                        max_examples,
-                                        params['pad_idx'])
-        
+        train_data = LazierDataset(Path(params['train_path']), params['max_src_len'], params['max_trg_len'], params['pad_idx'])
         train_loader = torch.utils.data.DataLoader(train_data, **dl_params)
 
         # ---------------------------------------------------------------------------- #
@@ -204,7 +194,6 @@ def main():
         # ---------------------------------------------------------------------------- #
         
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        print(f'Utilizing device - {device}')
 
         # Training hyperparameters
         learning_rate = params['lr']
@@ -231,6 +220,9 @@ def main():
                 # forward prop
                 output = model(spec, notes[..., :-1])           # Don't pass the last element into the decoder, want it to be predicted
                 # output = output.reshape(-1, output.shape[2])  # Reshape the output for use by criterion
+
+                print(f'output shape: {output.shape}')
+                
                 notes = notes[..., 1:] # .reshape(-1)           # Same for the notes
                 optimizer.zero_grad()                           # Zero out the gradient so it doesn't accumulate
 
@@ -239,13 +231,6 @@ def main():
                 if batch_idx%25 == 0:
                     print('\nEpoch {}, Batch {}'.format(epoch+1, batch_idx))
                     print('Training Loss: {}'.format(loss.item()))
-                    
-                    # Only take the metrics every 25 batches
-                    metrics_dfs = evaluate_model_run(output, notes)
-                    onset_saturation = metrics_dfs['Metric Values']['Saturation']['average']
-                    onset_f1 = metrics_dfs['Metric Values']['F1']['average']
-                    writer.add_scalar('Training Onset Saturation', onset_saturation, global_step=params['last_global_step'])
-                    writer.add_scalar('Training Onset F1', onset_f1, global_step=params['last_global_step'])
                 
                 loss.backward()     # Compute loss for every node in the computation graph
 
