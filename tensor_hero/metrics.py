@@ -215,6 +215,7 @@ def eval_fmeas_precision_recall(onset_true, onset_estimate, window = .05):
 
 def evaluate_model_run(model_output, ground_truth):
     """
+    Contains metrics that are measured throughout training.:w
     returns dictionary of dataframes
     dataframes include: Frequency Notes, Frequency Note Types, Model Metrics
 
@@ -225,6 +226,7 @@ def evaluate_model_run(model_output, ground_truth):
         - torch.Size([batch_size, 499])
     
     ~~~~ RETURNS ~~~
+    - model_run_metrics (dict of DataFrames)
         1. Frequency Table (% for each note value of total notes)
         2. Frequency Type Table (% for each type type of total notes)
         3. Metrics Table ('Saturation', 'F1', 'Precision', 'Recall') 
