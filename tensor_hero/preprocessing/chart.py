@@ -1,6 +1,7 @@
 from pathlib import Path
 import numpy as np
 from itertools import combinations
+import sys
 
 '''
 Contains functions related to processing .chart files
@@ -41,7 +42,9 @@ def chart2dict(path):
         with open(path, 'r') as file:
             raw_chart = file.readlines()
         file.close()
-    except:  # This will happen when the chart is not in .chart format
+    except Exception as err:  # This will happen when the chart is not in .chart format
+        print(f'Exception: {err}')
+        print(f'input path: {path}')
         return None, None, None, None
 
     # Strip lines of \n character

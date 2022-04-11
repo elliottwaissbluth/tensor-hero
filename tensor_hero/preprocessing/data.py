@@ -131,7 +131,7 @@ def __pop_sub_packs(sub_packs):
             shutil.rmtree(sub_pack)
 
 def populate_processed_folder(unprocessed_data_path, processed_data_path, REPLACE_NOTES = False,
-                              PRINT_TRACEBACK=True):
+                              PRINT_TRACEBACK=True, SUB_PACKS=False, TRACK_PACKS=True):
     '''
     Converts raw downloaded Clone Hero data into processed spectrograms and notes arrays.
     Populates processed_data_path by processing data in unprocessed_data_path.
@@ -140,6 +140,9 @@ def populate_processed_folder(unprocessed_data_path, processed_data_path, REPLAC
     - unprocessed_data_path (Path): directory containing track packs of downloaded Clone Hero songs
     - processed_data_path (Path): empty directory where processed data should be placed
     - REPLACE_NOTES (bool): if True, will replace any existing notes_arrays and spectrograms in processed
+    - PRINT_TRACEBACK (bool): if True, will print full traceback when excepted errors are thrown
+    - SUB_PACKS (bool): if True, will check for sub-packs within the parent unprocessed_data_path
+    - TRACK_PACKS (bool): if True, file structure expects the unprocessed folder contains track packs
     
     ~~~~ RETURNS ~~~~
     - dict: metadata about processed data
@@ -150,8 +153,9 @@ def populate_processed_folder(unprocessed_data_path, processed_data_path, REPLAC
         - 'notes_size' (float): notes arrays data size in GB
     '''
     # Extract songs from sub-packs, if the track pack includes sub-packs
-    sub_packs = __check_for_sub_packs(unprocessed_data_path)
-    __pop_sub_packs(sub_packs)
+    if SUB_PACKS:
+        sub_packs = __check_for_sub_packs(unprocessed_data_path)
+        __pop_sub_packs(sub_packs)
 
     wrong_format_charts = []    # Holds paths to charts not in .chart format
     multiple_audio_songs = []   # Holds paths to charts with multiple audio files
@@ -167,8 +171,12 @@ def populate_processed_folder(unprocessed_data_path, processed_data_path, REPLAC
         track_pack_ = Path(dirName).parent.stem     # track pack name
         song_ = Path(dirName).stem                  # song name
         
-        processed_path = processed_data_path / track_pack_ / song_          # processed song folder
-        unprocessed_path = unprocessed_data_path / track_pack_ / song_      # unprocessed song folder
+        if TRACK_PACKS:
+            processed_path = processed_data_path / track_pack_ / song_          # processed song folder
+            unprocessed_path = unprocessed_data_path / track_pack_ / song_      # unprocessed song folder
+        else:
+            processed_path = processed_data_path / track_pack_ / song_          # processed song folder
+            unprocessed_path = unprocessed_data_path / song_      # unprocessed song folder
         processed_song_path = processed_path / 'spectrogram.npy'            # spectrogram
         processed_notes_path = processed_path / 'notes.npy'                 # notes array
 
@@ -378,7 +386,7 @@ def __remove_modifiers(notes_array):
             new_notes[x] = simplified_note_dict[notes_array[x]]
     return new_notes
 
-def populate_with_simplified_notes(processed_directory):
+def populate_with_simplified_notes(processed_directory, SUB_PACKS=False):
     '''
     Takes all the processed notes arrays (notes.npy) in processed_directory and adds simplified versions 
     (notes_simplified.npy) to the same subdirectories.
@@ -394,15 +402,43 @@ def populate_with_simplified_notes(processed_directory):
         # Check to see if the .DS_Store file is in the directory, skip if so
         if '.DS_Store' in x:
             continue
-        for y in os.listdir(processed_directory / x):
+        if SUB_PACKS:
+            for y in os.listdir(processed_directory / x):
+                # Check to see if the simplified file already exists, continue if so
+                if os.path.isfile(processed_directory / x / y / 'notes_simplified.npy'):
+                    continue
+
+                try:
+                    notes_array = np.load(processed_directory / x / y / 'notes.npy')
+                except FileNotFoundError:
+                    print('Error: There is no notes.npy file at {}'.format(str(processed_directory / x / y)))
+                    print('Continuing')
+                    continue
+                except NotADirectoryError as err:
+                    print('ERROR: {}'.format(err))
+                    if str(y) == '.DS_Store':
+                        print('DS_Store error, continuing')
+                        continue
+                    else:
+                        break
+
+                new_notes = __remove_release_keys(notes_array)
+                new_notes = __remove_modifiers(new_notes)
+
+                # Save to same directory
+                with open(str(processed_directory / x / y / 'notes_simplified.npy'), 'wb') as f:
+                    np.save(f, new_notes)
+                f.close()
+        else:
+            
             # Check to see if the simplified file already exists, continue if so
-            if os.path.isfile(processed_directory / x / y / 'notes_simplified.npy'):
+            if os.path.isfile(processed_directory / x / 'notes_simplified.npy'):
                 continue
 
             try:
-                notes_array = np.load(processed_directory / x / y / 'notes.npy')
+                notes_array = np.load(processed_directory / x / 'notes.npy')
             except FileNotFoundError:
-                print('Error: There is no notes.npy file at {}'.format(str(processed_directory / x / y)))
+                print('Error: There is no notes.npy file at {}'.format(str(processed_directory / x)))
                 print('Continuing')
                 continue
             except NotADirectoryError as err:
@@ -417,7 +453,7 @@ def populate_with_simplified_notes(processed_directory):
             new_notes = __remove_modifiers(new_notes)
 
             # Save to same directory
-            with open(str(processed_directory / x / y / 'notes_simplified.npy'), 'wb') as f:
+            with open(str(processed_directory / x / 'notes_simplified.npy'), 'wb') as f:
                 np.save(f, new_notes)
             f.close()
 
@@ -593,7 +629,12 @@ def preprocess_transformer_data(segment_length, training_data_path, train_val_te
         print(f'made directory {str(test_path)}')
         
     if not SEPARATED:
-        _, processed_list = get_list_of_ogg_files(unprocessed_path)
+        # _, processed_list = get_list_of_ogg_files(unprocessed_path)
+        processed_path = training_data_path
+        processed_list = []
+        for x in [processed_path / x for x in os.listdir(processed_path)]:
+            if os.path.exists(x / 'spectrogram.npy') and os.path.exists(x / 'notes_simplified.npy'):
+                processed_list.append(x)
     else:
         _, processed_list = get_list_of_ogg_files(unprocessed_path, prefix='separated')
     
@@ -626,8 +667,9 @@ def preprocess_transformer_data(segment_length, training_data_path, train_val_te
         
         # print(f'notes shape: {notes.shape}')
         # print(f'spec shape: {spec.shape}')
-        if notes.shape[0] != spec.shape[1]:  #TODO: FIXME
-            continue
+        
+        # if notes.shape[0] != spec.shape[1]:  #TODO: FIXME
+            # continue
         assert notes.shape[0] == spec.shape[1], 'ERROR: Spectrogram and notes shape do not match'
         
         # Get number of segment_length second slices
@@ -688,7 +730,7 @@ def preprocess_transformer_data(segment_length, training_data_path, train_val_te
                 if not os.path.isdir(notes_outfile.parent):
                     os.mkdir(notes_outfile.parent)
 
-                np.save(spec_outfile, spec_bins[j,...].astype('float16')) # change to float16 to reduce hard disk memory
+                np.save(spec_outfile, spec_bins[j,...]) # change to float16 to reduce hard disk memory
                 np.save(notes_outfile, final_notes[j])
 
     return
