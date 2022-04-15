@@ -7,6 +7,12 @@ import pandas as pd
 ref = {k: v for v, k in enumerate([  1.,   2.,   3.,   4.,   5.,   6.,   7.,  10.,  11.,  13.,  14.,
         15.,  16.,  17.,  19.,  22.,  23.,  24.,  26., 218.])}
 ref[0.0] = 20
+ref[9.] = 1
+ref[8.] = 1
+ref[12.] = 2
+ref[18.] = 6
+ref[20.] = 7
+ref[21.] = 7
 
 #converting to note from index key
 rev_note_index_key = {v:k for k, v in ref.items()}
@@ -349,7 +355,9 @@ def difficulty_conversion(output_level, expert):
         else:
             cur_note = i
             #current note to replace -> key
-            cur_note_key = ref[cur_note]
+            '''dropped because current note should be simply the note in the expert array'''
+            # cur_note_key = ref[cur_note]
+            cur_note_key = int(i)
 
             #select note from the transition matrix
             #a = number of note keys to choose from,
@@ -366,3 +374,7 @@ def difficulty_conversion(output_level, expert):
     output_note_array = np.array(output_note_array)
 
     return output_note_array
+
+if __name__ == '__main__':
+    print(ref)
+    print(rev_note_index_key)
