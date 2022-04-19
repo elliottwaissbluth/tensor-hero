@@ -734,3 +734,225 @@ def preprocess_transformer_data(segment_length, training_data_path, train_val_te
                 np.save(notes_outfile, final_notes[j])
 
     return
+
+
+# ~~~~~~~~~~~~~~~ NOTES CONTOUR ~~~~~~~~~~~~~~~~~~ #
+    
+# Describes an easier way to index specific notes for the purpose of note category grouping
+# keys = more organized grouping for notes
+# values = original simplified note array representation
+note_category_grouping = {
+    1 : 1,
+    2 : 2,
+    3 : 3,
+    4 : 4,
+    5 : 5,
+    6 : 6,
+    7 : 10,
+    8 : 13,
+    9 : 15,
+    10 : 7,
+    11 : 11,
+    12 : 14,
+    13 : 8,
+    14 : 12,
+    15 : 9,
+    16 : 16,
+    17 : 22,
+    18 : 25,
+    19 : 17,
+    20 : 23,
+    21 : 19,
+    22 : 24,
+    23 : 18,
+    24 : 20,
+    25 : 21,
+    26 : 26,
+    27 : 30,
+    28 : 27,
+    29 : 29,
+    30 : 28,
+    31 : 31,
+    32 : 218
+}
+notes_to_note_category_grouping = dict([(v,k) for k,v in note_category_grouping.items()])
+
+# keys = note category grouping organized notes
+# values = note category encoding
+notes_to_note_category = {
+    1 : 1, # s
+    2 : 1,
+    3 : 1,
+    4 : 1,
+    5 : 1,
+    6 : 2, # d0
+    7 : 2,
+    8 : 2,
+    9 : 2,
+    10 : 3, # d1
+    11 : 3,
+    12 : 3,
+    13 : 4, # d2
+    14 : 4,
+    15 : 5, # d3
+    16 : 6, # t0
+    17 : 6,
+    18 : 6,
+    19 : 7, # t1
+    20 : 7,
+    21 : 8, # t2
+    22 : 8,
+    23 : 9, # t3
+    24 : 9,
+    25 : 9,
+    26 : 10, # q0
+    27 : 10,
+    28 : 11, # q1
+    29 : 11,
+    30 : 11,
+    31 : 12, # p
+    32 : 13  # o
+}
+
+cardinality_of_note_categories = {
+    1 : 5,
+    2 : 4,
+    3 : 3,
+    4 : 2,
+    5 : 1,
+    6 : 3,
+    7 : 2,
+    8 : 2,
+    9 : 3,
+    10 : 2,
+    11 : 3,
+    12 : 1,
+    13 : 1
+}
+
+# We use note category grouping of note to describe it
+note_category_to_note = {
+    1 : [1, 2, 3, 4, 5],
+    2 : [6, 7, 8, 9],
+    3 : [10, 11, 12],
+    4 : [13, 14],
+    5 : [15],
+    6 : [16, 17, 18],
+    7 : [19, 20],
+    8 : [21, 22],
+    9 : [23, 24, 25],
+    10 : [26, 27],
+    11 : [28, 29, 30],
+    12 : [31],
+    13 : [32]
+}
+
+# The note category encoded notes and their corresponding anchors
+notes_to_anchor = {
+    1 : 0,  # s[0]
+    2 : 1,  # s[1]
+    3 : 2,
+    4 : 3,
+    5 : 4,
+    6 : 0,  # d0[0]
+    7 : 1,  # d0[1]
+    8 : 2,
+    9 : 3,
+    10 : 0,
+    11 : 1,
+    12 : 2,
+    13 : 0,
+    14 : 1,
+    15 : 0,
+    16 : 0,
+    17 : 1,
+    18 : 2,
+    19 : 0,
+    20 : 1,
+    21 : 0,
+    22 : 1,
+    23 : 0,
+    24 : 1,
+    25 : 2,
+    26 : 0,
+    27 : 1,
+    28 : 0,
+    29 : 1,
+    30 : 2,
+    31 : 0,
+    32 : 0,
+}
+
+# Includes open, pent, quad, and d3 notes
+back_to_prev_anchor_notes = [15, *list(range(26,33))]
+
+def encode_contour(notes_array):
+    '''
+    Takes a notes array and encodes the contour as described in ../Documentation/contour.md
+
+    ~~~~ ARGUMENTS ~~~~
+    - notes_array (1D numpy array): Simplified notes array
+        - shape = (1, length of song in 10ms bines)
+        
+    ~~~~ RETURNS ~~~~
+    - contour (2D numpy array): Encoded notes_array
+        - shape = (2, length of song in 10ms bines)
+        - contour[0,:] contains a key for the note category, C
+        - contour[1,:] contains the corresponding motions at each onset
+        - Time bins without note events are filled with 0s
+    '''
+    contour = np.zeros(shape=(2, notes_array.shape[0]))
+    note_indices = np.where(notes_array > 0)[0]
+    
+    prev_anchor = 0   # We set the initial anchor at the green note, a=0
+    for note_idx in note_indices:
+        # Populate contour with note categories
+        contour[0, note_idx] = notes_to_note_category[notes_to_note_category_grouping[int(notes_array[note_idx])]]
+
+        # Populate contour with relative motion
+        if notes_to_note_category_grouping[int(notes_array[note_idx])] in back_to_prev_anchor_notes:
+            contour[1, note_idx] = 0
+        else:
+            new_anchor = notes_to_anchor[notes_to_note_category_grouping[int(notes_array[note_idx])]]
+            contour[1, note_idx] = new_anchor - prev_anchor
+            prev_anchor = new_anchor
+
+    return contour
+
+
+def decode_contour(contour):
+    '''
+    Takes an encoded contour array and decodes it into a simplified notes array
+    
+    ~~~~ ARGUMENTS ~~~~
+    - contour (2D numpy array): Encoded notes_array
+        - shape = (2, length of song in 10ms bins)
+        - contour[0,:] contains a key for the note category, C
+        - contour[1,:] contains the corresponding motions at each onset
+        - Time bins without note events are filled with 0s
+    
+    ~~~~ RETURNS ~~~~
+    - notes_array (1D numpy array): Decoded simplified notes_array
+        - shape = (1, length of song in 10ms bins)
+    '''
+    # print(f'contour shape: {contour.shape}')
+    notes_array = np.zeros(shape=(contour.shape[1]))
+    
+    # Loop through note categories in contour, adjusting anchor along the way
+    note_indices = np.where(contour[0] > 0)[0].astype(int)
+    anchor = 0  # Initialize anchor
+    for note_idx in note_indices:
+        if not int(contour[0,note_idx]) in [5, 10, 11, 12, 13]:  # If not d3, quad, pent, or open
+            anchor = anchor+int(contour[1,note_idx])
+            if anchor > cardinality_of_note_categories[int(contour[0,note_idx])]-1:  # Wrap around
+                anchor = 0
+            elif anchor < 0:
+                anchor = cardinality_of_note_categories[int(contour[0,note_idx])]-1
+            anchor = min(anchor, cardinality_of_note_categories[int(contour[0,note_idx])]-1)
+            notes_array[note_idx] = note_category_grouping[note_category_to_note[int(contour[0,note_idx])][anchor]]
+        else:
+            # choose at random for these note categories
+            temp_anchor = np.random.randint(0, cardinality_of_note_categories[int(contour[0,note_idx])])  
+            notes_array[note_idx] = note_category_grouping[note_category_to_note[int(contour[0,note_idx])][temp_anchor]]
+
+    return notes_array
