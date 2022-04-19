@@ -9,12 +9,12 @@ Contains functions related to processing .chart files
 These are mostly leveraged by ./data.py -> populate_processed_folder()
 '''
 
-def chart2tensor(path, print_release_notes=False):
+def chart2tensor(path, print_release_notes=False, difficulty='[ExpertSingle]'):
     '''
     Inputs a path to a chart and returns a tensor with 10ms ticks as indices and one hot
     representation as values.
     '''
-    coded_notes = chart2onehot(path, print_release_notes)
+    coded_notes = chart2onehot(path, print_release_notes, difficulty=difficulty)
 
     if coded_notes == None:
         print('\nThe chart at {} is not in .chart format'.format(path))
@@ -26,7 +26,7 @@ def chart2tensor(path, print_release_notes=False):
     return notes_tensor
 
     
-def chart2dict(path):
+def chart2dict(path, difficulty='[ExpertSingle]'):
     '''
     input:
         - path - a path to a chart
@@ -55,7 +55,13 @@ def chart2dict(path):
     song = []
     synctrack = []
     expertsingle = []
-
+    
+    difficulties = ['[Events]', '[EasySingle]', '[MediumSingle]','[HardSingle]','[ExpertSingle]']
+    assert difficulty in difficulties, f'ERROR: {difficulty} is an invalid difficulty argument'
+    difficulties.remove(difficulty)
+    lines_to_ignore = ['{', '}', '[Song]', 'ï»¿[Song]', '[SyncTrack]', '[Events]']
+    lines_to_ignore.append(difficulty) 
+    
     # Parse chart file, populating lists
     i = 0
     for data in raw_chart:
@@ -63,12 +69,12 @@ def chart2dict(path):
             i = 1
         elif data == '[SyncTrack]':
             i = 2
-        elif data in ['[Events]', '[EasySingle]', '[MediumSingle]','[HardSingle]']:
+        elif data in difficulties:
             i = 3
-        elif data == '[ExpertSingle]':
+        elif data == difficulty:
             i = 4
         
-        if data in ['{', '}', '[Song]', 'ï»¿[Song]', '[SyncTrack]', '[Events]', '[ExpertSingle]']:
+        if data in (lines_to_ignore): # Skip lines that mark section start
             continue
         if data[0] == ' ':
             if i == 1:
@@ -417,7 +423,7 @@ def get_configuration(path):
     return(configuration)
 
 
-def chart2onehot(path, print_release_notes=False):
+def chart2onehot(path, print_release_notes=False, difficulty='[ExpertSingle]'):
     '''
     Returns a dictionary with keys corresponding to ticks and values corresponding to
     one hot representations of note events. See ~/Prototypes/chart_to_one_hot.ipynb
@@ -426,7 +432,7 @@ def chart2onehot(path, print_release_notes=False):
     - print_release_notes = if true, will output a feed of release notes that had to be
                             bumped due to coincidence with the start of new notes.
     '''
-    notes, song_metadata, time_signatures, BPMs = chart2dict(path)
+    notes, song_metadata, time_signatures, BPMs = chart2dict(path, difficulty=difficulty)
     notes = shift_ticks(notes, song_metadata, time_signatures, BPMs)
 
     if notes == None:  # If the chart file is not in .chart format
