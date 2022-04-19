@@ -354,7 +354,7 @@ def difficulty_conversion(output_level, expert):
             #select note from the transition matrix
             #a = number of note keys to choose from,
             #p = prob distribution for the current key 
-            np.random.seed(7)
+            np.random.seed(123)
             note_selection = np.random.choice(21,replace= True,p= transition_matrix[cur_note_key])
             #convert note key to note selection
             note_to_replace = rev_note_index_key[note_selection]
