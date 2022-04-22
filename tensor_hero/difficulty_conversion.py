@@ -5,14 +5,8 @@ import pandas as pd
 
 #initialize the reference key to note 
 ref = {k: v for v, k in enumerate([  1.,   2.,   3.,   4.,   5.,   6.,   7.,  10.,  11.,  13.,  14.,
-        15.,  16.,  17.,  19.,  22.,  23.,  24.,  26., 218.])}
-ref[0.0] = 20
-ref[9.] = 1
-ref[8.] = 1
-ref[12.] = 2
-ref[18.] = 6
-ref[20.] = 7
-ref[21.] = 7
+        15.,  16.,  17.,  19.,  22.,  23.,  24.,  26., 218., 0.])}
+
 
 #converting to note from index key
 rev_note_index_key = {v:k for k, v in ref.items()}
@@ -126,7 +120,13 @@ def difficulty_conversion(output_level, expert):
         0.        , 0.        , 0.        , 0.        , 0.        ,
         0.        , 0.        , 0.        , 0.        , 0.        ,
         0.        , 0.        , 0.        , 0.        , 0.        ,
-        0.875     ]])
+        0.875     ],
+        [0.        , 0.        , 0.        , 0.        , 0.        ,
+        0.        , 0.        , 0.        , 0.        , 0.        ,
+        0.        , 0.        , 0.        , 0.        , 0.        ,
+        0.        , 0.        , 0.        , 0.        , 0.        ,
+        1.        ]          
+        ])
     exp_to_med_matrix = np.array([[0.39106145, 0.06703911, 0.00558659, 0.        , 0.        ,
         0.        , 0.        , 0.        , 0.        , 0.        ,
         0.        , 0.        , 0.        , 0.        , 0.        ,
@@ -226,7 +226,12 @@ def difficulty_conversion(output_level, expert):
         0.125     , 0.        , 0.        , 0.        , 0.        ,
         0.        , 0.        , 0.        , 0.        , 0.        ,
         0.        , 0.        , 0.        , 0.        , 0.        ,
-        0.75      ]])
+        0.75      ],
+        [0.        , 0.        , 0.        , 0.        , 0.        ,
+        0.        , 0.        , 0.        , 0.        , 0.        ,
+        0.        , 0.        , 0.        , 0.        , 0.        ,
+        0.        , 0.        , 0.        , 0.        , 0.        ,
+        1.        ]])
     exp_to_hard_matrix = np.array([[0.16759777, 0.33519553, 0.01675978, 0.        , 0.        ,
         0.        , 0.        , 0.        , 0.        , 0.        ,
         0.        , 0.        , 0.        , 0.        , 0.        ,
@@ -331,7 +336,12 @@ def difficulty_conversion(output_level, expert):
         0.        , 0.        , 0.        , 0.        , 0.        ,
         0.        , 0.        , 0.        , 0.        , 0.        ,
         0.        , 0.        , 0.        , 0.        , 0.        ,
-        0.        ]])
+        0.        ],
+        [0.        , 0.        , 0.        , 0.        , 0.        ,
+        0.        , 0.        , 0.        , 0.        , 0.        ,
+        0.        , 0.        , 0.        , 0.        , 0.        ,
+        0.        , 0.        , 0.        , 0.        , 0.        ,
+        1.        ]])
 
     
     if output_level == 'easy':
@@ -354,10 +364,13 @@ def difficulty_conversion(output_level, expert):
 
         else:
             cur_note = i
+            #if cur_note_key is not in the ref, assign to the 0.0, 
+            if cur_note not in ref.keys():
+                #print('not find')
+                cur_note = 0.0
+
             #current note to replace -> key
-            '''dropped because current note should be simply the note in the expert array'''
-            # cur_note_key = ref[cur_note]
-            cur_note_key = int(i)
+            cur_note_key = ref[cur_note]
 
             #select note from the transition matrix
             #a = number of note keys to choose from,
