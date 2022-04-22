@@ -54,7 +54,8 @@ notes_to_chart_strings = {
     29 : ['0','2','3','4'],
     30 : ['1','2','3','4'],
     31 : ['0','1','2','3','4'],
-    32 : ['7']
+    32 : ['7'],
+    218 : ['7']
 }
 
 def __single_prediction_to_notes_array(prediction):
@@ -276,7 +277,8 @@ def write_song_from_notes_array(song_metadata, notes_array, outfolder):
         - should already exist
     '''
     f = open(str(outfolder / 'notes.chart'), 'w')
-
+    notes_array = list(notes_array.astype(int))
+    
     # populate '[Song]' portion of file
     f.writelines(['[Song]\n', '{\n'])
     for k, v in song_metadata.items():
