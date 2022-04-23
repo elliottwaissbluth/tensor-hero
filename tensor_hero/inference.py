@@ -4,6 +4,7 @@ from tqdm import tqdm
 import os
 import shutil
 from tensor_hero.preprocessing.audio import compute_mel_spectrogram
+from tensor_hero.preprocessing.data import decode_contour
 from tensor_hero.model import Transformer
 from pathlib import Path
 
@@ -88,6 +89,60 @@ def __single_prediction_to_notes_array(prediction):
     for pair in pairs:
         notes_array[pair[0]-32] = pair[1]
     return notes_array
+
+def __contour_prediction_to_notes_array(prediction, tbps=25):
+    '''
+    Takes a single contour prediction from the transformer and translates it to a notes array
+    of length 400.
+
+    ~~~~ ARGUMENTS ~~~~
+    -   prediction (numpy Array, shape=(<max_trg_len>,)):
+            -   Prediction from the transformer, should be a single list of max indices
+                from transformer prediction. 
+            -   Expected to be formatted as
+                [<sos>, time, note plurality, motion, etc., <eos>, <pad>, <pad>, etc.]
+    -   tbps (int): time bins per second of predicted notes
+        
+    ~~~~ RETURNS ~~~~
+    -   notes_array (Numpy Array, shape = (400,)):
+            -   The prediction
+    '''
+    if type(prediction) == torch.Tensor:
+        prediction = prediction.detach().cpu().numpy()
+
+    #     value           information
+    # ____________________________________
+    # 0            | <sos> 
+    # 1            | <eos> 
+    # 2            | <pad>
+    # 3-15         | <note pluralities>    
+    # 16-24        | <motion [-4, 4]>    
+    # 25-(tbps*4+24) | <time bin 1-tbps>
+
+    note_vals = list(range(3, 16))            # Note pluralities
+    time_vals = list(range(25, tbps*4+24))    # Corresponding to times
+    motion_vals = list(range(16, 25))         # Motion in [-4,4]
+    
+    # Loop through the array 3 elements at a time
+    pairs = []
+    for i in range(prediction.shape[0]-2):
+        pair = (prediction[i], prediction[i+1], prediction[i+2]) # Take predicted notes as couples
+        if pair[0] in time_vals and pair[1] in note_vals and pair[2] in motion_vals:
+            pairs.append(pair)  # Append if pair follows (time, note) pattern
+
+    # Create contour from pairs
+    expansion_factor = 100/tbps
+    contour = np.zeros(shape=(2, 400))
+    for pair in pairs:
+        index = min(round((pair[0]-25)*expansion_factor), 400)
+        contour[0, index] = pair[1]-2    # note plurality
+        contour[1, index] = pair[2]-20   # motion
+    
+    # Create notes array from contour
+    notes_array = decode_contour(contour)
+     
+    return notes_array
+
 
 def transformer_output_to_notes_array(output, PROBABILITIES=True):
     '''

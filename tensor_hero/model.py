@@ -4,8 +4,15 @@ import numpy as np
 import os
 from pathlib import Path
 from tqdm import tqdm
-import sys
 import math
+import sys
+try:
+    sys.path.insert(1, str(Path.cwd()))
+    from tensor_hero.preprocessing.data import encode_contour, notes_array_time_adjust
+except:
+    sys.path.insert(1, str(Path.cwd().parent))
+    from tensor_hero.preprocessing.data import encode_contour, notes_array_time_adjust
+    
 
 def check_notes_length(notes_path, max_len):
     '''Opens the processed notes array at notes_path and checks whether or not it is larger than max_len
@@ -35,6 +42,113 @@ def note_dirs_from_spec_dirs(spec_file):
     Path: Path to notes array corresponding to spec in spec_file
     '''
     return Path(str(spec_file).replace('spectrograms', 'notes'))
+
+# ---------------------------------------------------------------------------- #
+#                               CONTOUR DATASETS                               #
+# ---------------------------------------------------------------------------- #
+
+# LIFTED FROM tensor_hero.inference TO AVOID CIRCULAR IMPORT
+def __single_prediction_to_notes_array(prediction):
+    '''
+    Takes a single prediction from the transformer and translates it to a notes array
+    of length 400.
+
+    ~~~~ ARGUMENTS ~~~~
+    -   prediction (Numpy Array, shape=(<max_trg_len>,)):
+            -   Prediction from the transformer, should be a single list of max indices
+                from transformer prediction. Expected to be in (time, note, time, note, etc.)
+                format.
+        
+    ~~~~ RETURNS ~~~~
+    -   notes_array (Numpy Array, shape = (400,)):
+            -   The prediction translated into a 4 second simplified notes array
+    '''
+    note_vals = list(range(32))     # Values of output array corresponding to notes
+    time_vals = list(range(32,432)) # Corresponding to times
+
+    # Loop through the array two elements at a time
+    pairs = []
+    for i in range(prediction.shape[0]-1):
+        pair = (prediction[i], prediction[i+1]) # Take predicted notes as couples
+        if pair[0] in time_vals and pair[1] in note_vals:
+            pairs.append(pair)  # Append if pair follows (time, note) pattern
+
+    # Create notes array
+    notes_array = np.zeros(400)
+    for pair in pairs:
+        notes_array[pair[0]-32] = pair[1]
+    return notes_array
+
+def contour_vector_from_notes(notes, tbps):
+    '''Captures original transformer output notes arrays and translates them to
+    contour vectors
+
+    Args:
+        notes (1D numpy array): original transformer output formatted notes
+        tbps (int): time bins per second represented in output array
+    Returns:
+        contour_vector (1D numpy array): transformer formatted contour array
+            - [time, note plurality, motion, time, note plurality, motion, ...]
+    '''
+    notes_array = __single_prediction_to_notes_array(notes)
+
+    # Reduce time bins per second from 100 to tbps
+    notes_array, _ = notes_array_time_adjust(notes_array, time_bins_per_second=tbps)
+    
+    # Create contour
+    contour = encode_contour(notes_array)
+    
+    # Convert to vector representation
+    #      index         information
+    #  0            | <sos> 
+    #  1            | <eos> 
+    #  2            | <pad> 
+    #  3-15         | <note pluralities 0-13>
+    #  16-24        | <motion [-4, 4]>
+    #  25-(tbps+25) | <time bin 1-tbps>
+    contour_vector = contour_to_transformer_output(contour, tbps)
+    return contour_vector
+
+def contour_to_transformer_output(contour, tbps):
+    '''Generates transformer output version of contour array
+    
+    ~~~~ ARGUMENTS ~~~~
+        contour (2D numpy array): contour array, note plurality is first row, motion
+                                    is second row 
+        tbps (int): time bins per second. Determines dimensionality of output_vector
+    ~~~~ RETURNS ~~~~
+        contour_vector (1D numpy array):
+            [time, note plurality, motion, time, note plurality, motion, ...]
+
+        The values of contour_vector are detailed below
+
+            value           information
+        ____________________________________
+        0            | <sos> 
+        1            | <eos> 
+        2            | <pad>
+        3-15         | <note pluralities    
+        16-24        | <motion [-4, 4]>    
+        25-(tbps+24) | <time bin 1-tbps>
+    '''
+    # Find indices with note events and create empty vector for contour
+    note_events = np.where(contour[0,:] > 0)[0].astype(int)
+    contour_vector = np.zeros(shape=(2+note_events.shape[0]*3))
+    
+    # Populate contour_vector
+    # 0 is already encoded as <sos>
+    motion_idx = lambda motion: motion + 20     # motion in [-4, 4] -> [16, 24]
+    time_idx = lambda time: time + 25           # time bin in [0,24] -> [25, 49]
+    np_idx = lambda note_p: note_p + 2          # note plurality in [1, 13] -> [3, 15]
+    for idx, ne in enumerate(list(note_events)):
+        contour_vector[1+(3*idx)] = time_idx(ne)
+        contour_vector[2+(3*idx)] = np_idx(contour[0, ne])
+        contour_vector[3+(3*idx)] = motion_idx(contour[1, ne])
+    
+    # Populate eos
+    contour_vector[-1] = 1
+    return contour_vector
+
 
 # ---------------------------------------------------------------------------- #
 #                                CHUNKS DATASET                                #
