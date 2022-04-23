@@ -213,7 +213,7 @@ def eval_fmeas_precision_recall(onset_true, onset_estimate, window = .05):
     return error_metrics
 
 
-def evaluate_model_run(model_output, ground_truth):
+def evaluate_model_run(model_output, ground_truth, contour_encoded=False):
     """
     Contains metrics that are measured throughout training.:w
     returns dictionary of dataframes
@@ -235,8 +235,12 @@ def evaluate_model_run(model_output, ground_truth):
     model_run_metrics = {}
  
     #convert tensor format to np arrays for both candidate tensor output, and truth tensor
-    predicted_notes_batch = transformer_output_to_notes_array(model_output, PROBABILITIES=True)
-    true_notes_batch = transformer_output_to_notes_array(ground_truth, PROBABILITIES=False)
+    predicted_notes_batch = transformer_output_to_notes_array(model_output, 
+                                                              PROBABILITIES=True,
+                                                              contour_encoded=contour_encoded)
+    true_notes_batch = transformer_output_to_notes_array(ground_truth, 
+                                                         PROBABILITIES=False,
+                                                         contour_encoded=contour_encoded)
 
     #create placeholder metric objects
     freq_saturation_arr = np.zeros(shape=(len(predicted_notes_batch), 1))

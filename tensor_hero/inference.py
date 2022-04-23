@@ -144,7 +144,7 @@ def __contour_prediction_to_notes_array(prediction, tbps=25):
     return notes_array
 
 
-def transformer_output_to_notes_array(output, PROBABILITIES=True):
+def transformer_output_to_notes_array(output, PROBABILITIES=True, contour_encoded=False):
     '''
     Takes a batch of output or input to the transformer and converts it to notes arrays.
     Converts the "model 1 data" as described in ./Documentation/'format of model 1 data.txt'
@@ -175,9 +175,14 @@ def transformer_output_to_notes_array(output, PROBABILITIES=True):
     
     # Initialize matrix of notes arrays
     notes_arrays = np.empty(shape=(output.shape[0], 400))
-    for idx in range(output.shape[0]):      # Each element of the batch gets computed individually
-        prediction = np.delete(output[idx], np.where(output[idx] >= 432))  # delete <sos>, <eos>, <pad>
-        notes_arrays[idx] = __single_prediction_to_notes_array(prediction)
+    if not contour_encoded:
+        for idx in range(output.shape[0]):      # Each element of the batch gets computed individually
+            prediction = np.delete(output[idx], np.where(output[idx] >= 432))  # delete <sos>, <eos>, <pad>
+            notes_arrays[idx] = __single_prediction_to_notes_array(prediction)
+    else:
+        for idx in range(output.shape[0]):      # Each element of the batch gets computed individually
+            prediction = np.delete(output[idx], np.where(output[idx] <= 2))  # delete <sos>, <eos>, <pad>
+            notes_arrays[idx] = __contour_prediction_to_notes_array(prediction)
 
     return  notes_arrays
 
