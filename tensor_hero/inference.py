@@ -4,6 +4,7 @@ from tqdm import tqdm
 import os
 import shutil
 from tensor_hero.preprocessing.audio import compute_mel_spectrogram
+from tensor_hero.preprocessing.data import decode_contour
 from tensor_hero.model import Transformer
 from pathlib import Path
 
@@ -54,7 +55,8 @@ notes_to_chart_strings = {
     29 : ['0','2','3','4'],
     30 : ['1','2','3','4'],
     31 : ['0','1','2','3','4'],
-    32 : ['7']
+    32 : ['7'],
+    218 : ['7']
 }
 
 def __single_prediction_to_notes_array(prediction):
@@ -88,7 +90,61 @@ def __single_prediction_to_notes_array(prediction):
         notes_array[pair[0]-32] = pair[1]
     return notes_array
 
-def transformer_output_to_notes_array(output, PROBABILITIES=True):
+def __contour_prediction_to_notes_array(prediction, tbps=25):
+    '''
+    Takes a single contour prediction from the transformer and translates it to a notes array
+    of length 400.
+
+    ~~~~ ARGUMENTS ~~~~
+    -   prediction (numpy Array, shape=(<max_trg_len>,)):
+            -   Prediction from the transformer, should be a single list of max indices
+                from transformer prediction. 
+            -   Expected to be formatted as
+                [<sos>, time, note plurality, motion, etc., <eos>, <pad>, <pad>, etc.]
+    -   tbps (int): time bins per second of predicted notes
+        
+    ~~~~ RETURNS ~~~~
+    -   notes_array (Numpy Array, shape = (400,)):
+            -   The prediction
+    '''
+    if type(prediction) == torch.Tensor:
+        prediction = prediction.detach().cpu().numpy()
+
+    #     value           information
+    # ____________________________________
+    # 0            | <sos> 
+    # 1            | <eos> 
+    # 2            | <pad>
+    # 3-15         | <note pluralities>    
+    # 16-24        | <motion [-4, 4]>    
+    # 25-(tbps*4+24) | <time bin 1-tbps*4>
+
+    note_vals = list(range(3, 16))            # Note pluralities
+    time_vals = list(range(25, tbps*4+24))    # Corresponding to times
+    motion_vals = list(range(16, 25))         # Motion in [-4,4]
+    
+    # Loop through the array 3 elements at a time
+    pairs = []
+    for i in range(prediction.shape[0]-2):
+        pair = (prediction[i], prediction[i+1], prediction[i+2]) # Take predicted notes as couples
+        if pair[0] in time_vals and pair[1] in note_vals and pair[2] in motion_vals:
+            pairs.append(pair)  # Append if pair follows (time, note) pattern
+
+    # Create contour from pairs
+    expansion_factor = 100/tbps
+    contour = np.zeros(shape=(2, 400))
+    for pair in pairs:
+        index = min(round((pair[0]-25)*expansion_factor), 400)
+        contour[0, index] = pair[1]-2    # note plurality
+        contour[1, index] = pair[2]-20   # motion
+    
+    # Create notes array from contour
+    notes_array = decode_contour(contour)
+     
+    return notes_array
+
+
+def transformer_output_to_notes_array(output, PROBABILITIES=True, contour_encoded=False):
     '''
     Takes a batch of output or input to the transformer and converts it to notes arrays.
     Converts the "model 1 data" as described in ./Documentation/'format of model 1 data.txt'
@@ -119,9 +175,14 @@ def transformer_output_to_notes_array(output, PROBABILITIES=True):
     
     # Initialize matrix of notes arrays
     notes_arrays = np.empty(shape=(output.shape[0], 400))
-    for idx in range(output.shape[0]):      # Each element of the batch gets computed individually
-        prediction = np.delete(output[idx], np.where(output[idx] >= 432))  # delete <sos>, <eos>, <pad>
-        notes_arrays[idx] = __single_prediction_to_notes_array(prediction)
+    if not contour_encoded:
+        for idx in range(output.shape[0]):      # Each element of the batch gets computed individually
+            prediction = np.delete(output[idx], np.where(output[idx] >= 432))  # delete <sos>, <eos>, <pad>
+            notes_arrays[idx] = __single_prediction_to_notes_array(prediction)
+    else:
+        for idx in range(output.shape[0]):      # Each element of the batch gets computed individually
+            prediction = np.delete(output[idx], np.where(output[idx] <= 2))  # delete <sos>, <eos>, <pad>
+            notes_arrays[idx] = __contour_prediction_to_notes_array(prediction)
 
     return  notes_arrays
 
@@ -203,7 +264,7 @@ def m1_song_preprocessing(song_path):
 
     return full_spec
 
-def predict(model, device, input, sos_idx, max_len):
+def predict(model, device, input, sos_idx, max_len, eos_idx = 433):
     '''
     Predicts the output sequence for a single input spectrogram
 
@@ -232,33 +293,26 @@ def predict(model, device, input, sos_idx, max_len):
                    ((0, 0), (0, max_len-input.shape[1])),
                    'constant',
                    constant_values = 0)
+
     # Convert input to torch tensor
     input = torch.tensor(input, dtype=torch.float).to(device)
-    # Add batch dimension
-    input = input.unsqueeze(0)
+    input = input.unsqueeze(0) # Add batch dimension
 
     # Create initial input sequence, i.e. [<sos>]
     prediction = torch.tensor(np.array([sos_idx])).to(device)
-    # Add batch dimension
-    prediction = prediction.unsqueeze(0)
+    prediction = prediction.unsqueeze(0) # Add batch dimension
 
+    # Get model output and construct prediction
     for i in tqdm(range(max_len)):
 
         # Get output
         output = model(input, prediction)
         pred = torch.tensor([torch.argmax(output[0,-1,:]).item()]).unsqueeze(0).to(device)
+        
         # Stop predicting once <eos> is output
-        if pred == 433:
+        if pred == eos_idx:
             break
         prediction = torch.cat((prediction, pred), dim=1)
-        if pred == 433:
-            break
-        # print(torch.argmax(output[0,-1,:]).item())
-
-        # if i > 0 and torch.argmax(output[0,-1,:]).item() == 433:
-            # print('final predicted output:')
-            # print(prediction)
-            # break
     
     return prediction, output
 
@@ -276,7 +330,8 @@ def write_song_from_notes_array(song_metadata, notes_array, outfolder):
         - should already exist
     '''
     f = open(str(outfolder / 'notes.chart'), 'w')
-
+    notes_array = list(notes_array.astype(int))
+    
     # populate '[Song]' portion of file
     f.writelines(['[Song]\n', '{\n'])
     for k, v in song_metadata.items():
@@ -303,7 +358,7 @@ def write_song_from_notes_array(song_metadata, notes_array, outfolder):
         
 
 def full_song_prediction(song_path, model, device, sos_idx, max_len, song_metadata, outfolder, 
-                         PRINT=False, RETURN_RAW_OUTPUT=False):
+                         PRINT=False, RETURN_RAW_OUTPUT=False, contour_encoded=False, eos_idx=433):
     '''
     Reads the song at song_path, uses model to predict notes over time, saves .chart to outfolder
     and copies song there as well. This outfolder can then be dropped into Clone Hero's song dir.
@@ -341,10 +396,13 @@ def full_song_prediction(song_path, model, device, sos_idx, max_len, song_metada
     notes_array = np.zeros(full_spec.shape[0]*full_spec.shape[2])
     for i in range(full_spec.shape[0]):
         print(f'predicting segment {i}/{full_spec.shape[0]}')
-        prediction, raw_output = predict(model, device, full_spec[i,...], sos_idx, max_len)
+        prediction, raw_output = predict(model, device, full_spec[i,...], sos_idx, max_len, eos_idx=eos_idx)
         if PRINT:
             print('m1 notes tensor: {}'.format(prediction))
-        notes_array[(i*full_spec.shape[2]):((i+1)*full_spec.shape[2])] = m1_tensor_to_note_array(prediction)
+        if not contour_encoded:
+            notes_array[(i*full_spec.shape[2]):((i+1)*full_spec.shape[2])] = m1_tensor_to_note_array(prediction)
+        else:
+            notes_array[(i*full_spec.shape[2]):((i+1)*full_spec.shape[2])] = __contour_prediction_to_notes_array(prediction)
 
     # Write the outfolder
     if not os.path.isdir(outfolder):

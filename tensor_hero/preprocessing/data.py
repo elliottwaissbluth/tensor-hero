@@ -956,3 +956,33 @@ def decode_contour(contour):
             notes_array[note_idx] = note_category_grouping[note_category_to_note[int(contour[0,note_idx])][temp_anchor]]
 
     return notes_array
+
+def notes_array_time_adjust(notes_array, time_bins_per_second, reverse=False):
+    '''
+    Takes a notes array with 100 ticks per second and adjusts it to have time_bins_per_second
+    time bins per second. Will snap to the nearest integer during division.
+
+    ~~~~ ARGUMENTS ~~~~
+    - notes_array (1D numpy array): notes_array with 100 time bins per second
+    - time_bins_per_second (int): desired number of time bins per second 
+    - reverse (bool): if True, will expand from time_bins_per_second to 100 time bins per second
+
+    ~~~~ RETURNS ~~~~
+    - notes_array_reduced (1D numpy array): note_array with time_bins_per_second time bins per second
+    - reduction_factor (float): the factor the time bins were reduced by
+    '''
+    if not reverse:
+        reduction_factor = 100/time_bins_per_second
+    else:
+        reduction_factor = time_bins_per_second/100
+    onset_indices = np.where(notes_array > 0)[0]
+    notes_array_reduced = np.zeros(shape=(math.ceil(notes_array.shape[0]/reduction_factor)+1))
+   
+    # Maps original onset times to reduced onset times 
+    onset_mapping = dict([(x, round(x/reduction_factor)) for x in onset_indices])
+
+    # Populate notes_array_reduced with notes
+    for onset, reduced_onset in onset_mapping.items():
+       notes_array_reduced[reduced_onset] = notes_array[onset] 
+
+    return notes_array_reduced, reduction_factor

@@ -4,8 +4,15 @@ import numpy as np
 import os
 from pathlib import Path
 from tqdm import tqdm
-import sys
 import math
+import sys
+try:
+    sys.path.insert(1, str(Path.cwd()))
+    from tensor_hero.preprocessing.data import encode_contour, notes_array_time_adjust
+except:
+    sys.path.insert(1, str(Path.cwd().parent))
+    from tensor_hero.preprocessing.data import encode_contour, notes_array_time_adjust
+    
 
 def check_notes_length(notes_path, max_len):
     '''Opens the processed notes array at notes_path and checks whether or not it is larger than max_len
@@ -35,7 +42,6 @@ def note_dirs_from_spec_dirs(spec_file):
     Path: Path to notes array corresponding to spec in spec_file
     '''
     return Path(str(spec_file).replace('spectrograms', 'notes'))
-
 # ---------------------------------------------------------------------------- #
 #                                CHUNKS DATASET                                #
 # ---------------------------------------------------------------------------- #
@@ -220,7 +226,8 @@ class ColabMemoryDataset(torch.utils.data.Dataset):
         specs_dirs = [x / 'spectrograms' for x in song_paths]
 
         specs_lists = []
-        for dir_ in specs_dirs:
+        print('Loading list of notes and spectrogram files')
+        for dir_ in tqdm(specs_dirs):
             for specs_dir, _, specs in os.walk(dir_):
                 if not specs:
                     continue
@@ -268,13 +275,14 @@ class ColabMemoryDataset(torch.utils.data.Dataset):
         self.notes = np.empty(shape=(self.max_examples, max_trg_len))
         
         # Populate data into memory
+        print('Populating data into memory')
         for idx in tqdm(range(self.max_examples)):
             spec = self.pad_spec(np.load(self.data_paths[idx]))
             notes = self.pad_notes(np.load(self.labels[self.data_paths[idx]]))
             self.specs[idx,...] = spec      # Final data
             self.notes[idx,...] = notes     # Final data
-        print(f'self.specs (shape = {self.specs.shape}) is taking up {sys.getsizeof(self.specs) / (1024**2):.2f} MB')
-        print(f'self.notes (shape = {self.notes.shape}) is taking up {sys.getsizeof(self.notes) / (1024**2):.2f} MB')
+        print(f'self.specs (shape = {self.specs.shape}) is taking up {(sys.getsizeof(self.specs) / (1024**2))/1000:.2f} GB')
+        print(f'self.notes (shape = {self.notes.shape}) is taking up {(sys.getsizeof(self.notes) / (1024**2)):.2f} GB')
         del spec, notes
         
     def __len__(self):
@@ -298,6 +306,186 @@ class ColabMemoryDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         return torch.tensor(self.specs[idx], dtype=torch.float), torch.tensor(self.notes[idx], dtype=torch.long)
+
+# ---------------------------------------------------------------------------- #
+#                               CONTOUR DATASETS                               #
+# ---------------------------------------------------------------------------- #
+
+# LIFTED FROM tensor_hero.inference TO AVOID CIRCULAR IMPORT
+def __single_prediction_to_notes_array(prediction):
+    '''
+    Takes a single prediction from the transformer and translates it to a notes array
+    of length 400.
+
+    ~~~~ ARGUMENTS ~~~~
+    -   prediction (Numpy Array, shape=(<max_trg_len>,)):
+            -   Prediction from the transformer, should be a single list of max indices
+                from transformer prediction. Expected to be in (time, note, time, note, etc.)
+                format.
+        
+    ~~~~ RETURNS ~~~~
+    -   notes_array (Numpy Array, shape = (400,)):
+            -   The prediction translated into a 4 second simplified notes array
+    '''
+    note_vals = list(range(32))     # Values of output array corresponding to notes
+    time_vals = list(range(32,432)) # Corresponding to times
+
+    # Loop through the array two elements at a time
+    pairs = []
+    for i in range(prediction.shape[0]-1):
+        pair = (prediction[i], prediction[i+1]) # Take predicted notes as couples
+        if pair[0] in time_vals and pair[1] in note_vals:
+            pairs.append(pair)  # Append if pair follows (time, note) pattern
+
+    # Create notes array
+    notes_array = np.zeros(400)
+    for pair in pairs:
+        notes_array[pair[0]-32] = pair[1]
+    return notes_array
+
+def contour_vector_from_notes(notes, tbps):
+    '''Captures original transformer output notes arrays and translates them to
+    contour vectors
+
+    Args:
+        notes (1D numpy array): original transformer output formatted notes
+        tbps (int): time bins per second represented in output array
+    Returns:
+        contour_vector (1D numpy array): transformer formatted contour array
+            - [time, note plurality, motion, time, note plurality, motion, ...]
+    '''
+    notes_array = __single_prediction_to_notes_array(notes)
+
+    # Reduce time bins per second from 100 to tbps
+    notes_array, _ = notes_array_time_adjust(notes_array, time_bins_per_second=tbps)
+    
+    # Create contour
+    contour = encode_contour(notes_array)
+    
+    # Convert to vector representation
+    #      index         information
+    #  0            | <sos> 
+    #  1            | <eos> 
+    #  2            | <pad> 
+    #  3-15         | <note pluralities 0-13>
+    #  16-24        | <motion [-4, 4]>
+    #  25-(tbps+25) | <time bin 1-tbps>
+    contour_vector = contour_to_transformer_output(contour, tbps)
+    return contour_vector
+
+def contour_to_transformer_output(contour, tbps):
+    '''Generates transformer output version of contour array
+    
+    ~~~~ ARGUMENTS ~~~~
+        contour (2D numpy array): contour array, note plurality is first row, motion
+                                    is second row 
+        tbps (int): time bins per second. Determines dimensionality of output_vector
+    ~~~~ RETURNS ~~~~
+        contour_vector (1D numpy array):
+            [time, note plurality, motion, time, note plurality, motion, ...]
+
+        The values of contour_vector are detailed below
+
+            value           information
+        ____________________________________
+        0            | <sos> 
+        1            | <eos> 
+        2            | <pad>
+        3-15         | <note pluralities    
+        16-24        | <motion [-4, 4]>    
+        25-(tbps+24) | <time bin 1-tbps>
+    '''
+    # Find indices with note events and create empty vector for contour
+    note_events = np.where(contour[0,:] > 0)[0].astype(int)
+    contour_vector = np.zeros(shape=(2+note_events.shape[0]*3))
+    
+    # Populate contour_vector
+    # 0 is already encoded as <sos>
+    motion_idx = lambda motion: motion + 20     # motion in [-4, 4] -> [16, 24]
+    time_idx = lambda time: time + 25           # time bin in [0,24] -> [25, 49]
+    np_idx = lambda note_p: note_p + 2          # note plurality in [1, 13] -> [3, 15]
+    for idx, ne in enumerate(list(note_events)):
+        contour_vector[1+(3*idx)] = time_idx(ne)
+        contour_vector[2+(3*idx)] = np_idx(contour[0, ne])
+        contour_vector[3+(3*idx)] = motion_idx(contour[1, ne])
+    
+    # Populate eos
+    contour_vector[-1] = 1
+    return contour_vector
+
+class ContourMemoryDataset(ColabMemoryDataset):
+    '''Implementation of ColabMemoryDataset but transforms output into contour_vectors
+    '''
+    def __init__(self, partition_path, max_src_len, max_trg_len, max_examples, 
+                 pad_idx, CHECK_LENGTH=False, tbps=25):
+        self.max_trg_len = max_trg_len
+        self.max_src_len = max_src_len
+        self.pad_idx = pad_idx
+        self.tbps = 25
+        
+        # Construct list of spectrogram file paths and list of note file paths
+        song_paths = [partition_path / x for x in os.listdir(partition_path)]
+        specs_dirs = [x / 'spectrograms' for x in song_paths]
+        specs_lists = []
+        print('Loading list of notes and spectrogram files')
+        for dir_ in tqdm(specs_dirs):
+            for specs_dir, _, specs in os.walk(dir_):
+                if not specs:
+                    continue
+                specs_lists.append([Path(specs_dir) / spec for spec in specs])
+        specs_lists = [spec for spec_list in specs_lists for spec in spec_list]  # Flatten
+        notes_lists = [note_dirs_from_spec_dirs(x) for x in specs_lists]
+        
+        # Construct dictionary where key:value is <path to spec>:<path to notes array>
+        l = {}  # labels
+        for i in range(len(specs_lists)):
+            l[specs_lists[i]] = notes_lists[i]
+            
+        # Weed out bits of data that exceed the maximum length
+        self.labels = {}        # holds spec paths as keys, note paths as values
+        self.data_paths = []    # list of spec paths
+        too_long = 0            # how many of the notes have more elements than max_trg_len
+        if CHECK_LENGTH:
+            print('Checking length of spectrograms and notes...')
+            for x in tqdm(specs_lists):
+                if check_notes_length(l[x], max_trg_len):
+                    self.data_paths.append(x)
+                    self.labels[x] = l[x]
+                else:
+                    too_long += 1
+                print(f'{too_long} datapoints removed due to exceeding maximum length')
+        else:
+            self.data_paths = specs_lists
+            self.labels = l
+            print('Notes were not checked against max_trg_len')
+        
+        # Restrict max samples in Dataset to min(max_examples, num_samples)        
+        self.num_samples = len(self.labels)  # This could be lower than max_samples
+        self.max_examples = max_examples if max_examples > 0 else self.num_samples
+        self.max_examples = min(self.max_examples, self.num_samples)
+        del too_long, l, song_paths, specs_dirs, specs_lists, notes_lists
+        
+        # Create and empty data matrix
+        spec = np.load(self.data_paths[0])  # Load single examples to get shape
+        notes = np.load(self.labels[self.data_paths[0]])
+        # Shape for self.specs = [max_examples, 512, max_src_len]
+        # Shape for self.notes = [max_examples, max_trg_len]
+        self.specs = np.empty(shape=(self.max_examples, spec.shape[0], max_src_len))
+        self.notes = np.empty(shape=(self.max_examples, max_trg_len))
+        
+        # Populate data into memory
+        for idx in tqdm(range(self.max_examples)):
+            spec = self.pad_spec(np.load(self.data_paths[idx]))
+            # Transform notes into contour_vectors
+            # contour_vectors are formatted to be transformer output
+            notes = np.load(self.labels[self.data_paths[idx]])
+            notes = contour_vector_from_notes(notes, tbps)
+            notes = self.pad_notes(notes)
+            self.specs[idx,...] = spec      # Final data
+            self.notes[idx,...] = notes     # Final data
+        print(f'self.specs (shape = {self.specs.shape}) is taking up {sys.getsizeof(self.specs) / (1024**2):.2f} MB')
+        print(f'self.notes (shape = {self.notes.shape}) is taking up {sys.getsizeof(self.notes) / (1024**2):.2f} MB')
+        del spec, notes
 
 # ---------------------------------------------------------------------------- #
 #                                 LAZY DATASET                                 #
