@@ -343,7 +343,7 @@ def __single_prediction_to_notes_array(prediction):
         notes_array[pair[0]-32] = pair[1]
     return notes_array
 
-def contour_vector_from_notes(notes, tbps):
+def contour_vector_from_notes(notes, tbps, include_time=True):
     '''Captures original transformer output notes arrays and translates them to
     contour vectors
 
@@ -370,7 +370,7 @@ def contour_vector_from_notes(notes, tbps):
     #  3-15         | <note pluralities 0-13>
     #  16-24        | <motion [-4, 4]>
     #  25-(tbps+25) | <time bin 1-tbps>
-    contour_vector = contour_to_transformer_output(contour, tbps)
+    contour_vector = contour_to_transformer_output(contour, tbps, include_time)
     
     return contour_vector
 
@@ -423,8 +423,9 @@ def contour_to_transformer_output(contour, tbps, include_time=True):
             contour_vector[1+(2*idx)] = np_idx(contour[0, ne])
             contour_vector[2+(2*idx)] = motion_idx(contour[1, ne])
     
-    # Populate eos
+    # Populate eos, sos is already encoded as 0 at contour_vector[0]
     contour_vector[-1] = 1
+    
     return contour_vector
 
 class ContourMemoryDataset(ColabMemoryDataset):
