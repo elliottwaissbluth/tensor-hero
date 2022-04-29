@@ -82,3 +82,74 @@ def ninos(audio, sr, gamma=0.94):
     plt.plot(ninos)
 
     return ninos, J, hop_length
+
+def squeeze_idx(idx, min, max):
+    '''Helper function that ensures the indices of the windows stays between 0 and max.
+   
+    Args:
+        idx (int): Candidate index
+        min (int): Minimum value to be assigned (typically 0)
+        max (int): Maximum value to be assigned (typically len(arr) - 1)
+    
+    Returns:
+        idx (int): Correct index to be used for window bounds
+        
+    '''
+    if idx < min:
+        return min
+    elif idx > max:
+        return max
+    else:
+        return idx
+
+def onset_select(odf_arr, w1=3, w2=3, w3=7, w4=1, w5=0, delta=0, plot=False):
+    '''Implements peak-picking for the results of ninos ODF data. 
+   
+    Implementation as described in 
+        https://ismir2012.ismir.net/event/papers/049_ISMIR_2012.pdf 
+        
+    Args:
+        odf_arr (1D numpy array): Values of ninos ODF function
+        w1 (int): Hyperparameter for left boundary of window for condition 1
+        w2 (int): Hyperparameter for right boundary of window for condition 1
+        w3 (int): Hyperparameter for left boundary of window for condition 2
+        w4 (int): Hyperparameter for right boundary of window for condition 2
+        w5 (int): Hyperparameter for onset threshold (how many windows to use as buffer before selecting a new onset)
+        delta (float in [0,infinity)): Threshold for condition 2
+        plot (bool): Whether or not to plot onsets overlaid on ninos data
+    
+    Returns:
+        onsets (1D numpy array): Frame indices for onsets
+        
+    '''
+    onsets = []
+    plt_onsets = []
+
+    for frame in range(len(odf_arr)):
+        # Determine whether candidate frame is a local maximum
+        idx1 = squeeze_idx(frame-w1, 0, len(odf_arr)-1)
+        idx2 = squeeze_idx(frame+w2, 0, len(odf_arr)-1)
+        max_frame = idx1 + np.argmax(odf_arr[idx1:idx2])
+        cond1 = frame == max_frame
+        # Determine whether candidate frame surpasses local average by delta
+        idx1 = squeeze_idx(frame-w3, 0, len(odf_arr)-1)
+        idx2 = squeeze_idx(frame+w4, 0, len(odf_arr)-1)
+        mean_frame = np.mean(odf_arr[idx1:idx2]) + delta
+        cond2 = odf_arr[frame] >= mean_frame
+        # True by default if onsets is empty
+        cond3 = True
+
+        if len(onsets) > 0:
+            # Determine whether candidate frame surpasses a threshold since last onset
+            cond3 = frame - onsets[len(onsets) - 1] > w5
+        if cond1 and cond2 and cond3:
+            onsets.append(frame)
+            
+    onsets = np.array(onsets)
+    if plot:
+        plt.figure(figsize=(20, 15))
+        plt.plot(odf_arr[:1000])
+        plt.vlines(onsets[np.where(onsets < 1000)[0]], ymin=0, ymax=np.max(odf_arr[:1000]), colors=['red'])
+        plt.show()
+    return onsets
+    
