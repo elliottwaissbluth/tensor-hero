@@ -58,28 +58,17 @@ def ninos(audio, sr, gamma=0.94):
     
     # Order by magnitude within each time bin
     spec = np.sort(spec, axis=0)
-    plt.figure()
-    librosa.display.specshow(spec)
     
     # Remove the highest energy frames, cut down by factor of gamma
     J = math.floor(spec.shape[0]*gamma)
-    print(f'old spec shape: {spec.shape}')
     spec = spec[:J,:]
-    print(f'J: {J}')
-    print(f'new spec shape: {spec.shape}')
-    plt.figure()
-    librosa.display.specshow(spec)
     
     # Compute squared l2 norm and l4 norm of spec along time axis
     l2_squared = np.square(np.linalg.norm(spec, ord=2, axis=0))
-    print(f'l2_squared shape: {l2_squared.shape}')
     l4 = np.linalg.norm(spec, ord=4, axis=0)
-    print(f'l4 shape: {l4.shape}')
     
     # Convert to NINOS
     ninos = l2_squared / ((J**(1/4))*l4)
-    plt.figure()
-    plt.plot(ninos)
 
     return ninos, J, hop_length
 
