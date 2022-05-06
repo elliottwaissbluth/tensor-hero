@@ -4,7 +4,7 @@ import random
 
 import sys
 sys.path.insert(1, r'C:\Users\ewais\Documents\GitHub\tensor-hero\Model_1\Processing')
-from m1_postprocessing import *
+# from m1_postprocessing import *
 from pathlib import Path
 import shutil
 
@@ -22,6 +22,8 @@ def onset_time(song_path):
     # for idx in range (len(song_paths)):
     # Load the song
     y, sr = librosa.load(song_path)
+    print(f'min y: {np.min(y)}')
+    print(f'max y: {np.max(y)}')
 
     # resample the song if it isn't sr=22050 (for consistent sizing)
     if not sr == 22050:
@@ -29,15 +31,15 @@ def onset_time(song_path):
         sr = 22050
 
     #source seperation, margin can be tuned 
-    y_harmonic, _ = librosa.effects.hpss(y, margin=2.0)
+    # y_harmonic, _ = librosa.effects.hpss(y, margin=2.0)
 
     # Set Hop_len
     hop_len = 512
 
-    onset_frame_backtrack = librosa.onset.onset_detect(y_harmonic, sr = sr, hop_length = hop_len, backtrack=True)
-    onset_times = librosa.frames_to_time(onset_frame_backtrack)
+    onset_frame_backtrack = librosa.onset.onset_detect(y, sr = sr, hop_length = hop_len, backtrack=True)
+    onset_times = librosa.frames_to_time(onset_frame_backtrack, hop_length=hop_len)
 
-    return y_harmonic, onset_times
+    return y, onset_times
 
 def onset_time_bins(onset_times):
     otb = [int(x) for x in onset_times*100]
@@ -63,9 +65,9 @@ def create_notes_array(onsets, notes):
 
     # Cut down notes if there are more notes than onsetse
     if len(notes) > len(onsets):
-        notes = notes[:len(onsets)]
+        notes = notes[:(len(onsets)-1)]
     
-    notes_array = np.zeros(onsets[-1])
+    notes_array = np.zeros(onsets[-1]+1)
     np.put(notes_array, onsets[:-1], notes)
 
     return notes_array

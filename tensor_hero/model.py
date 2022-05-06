@@ -343,7 +343,7 @@ def __single_prediction_to_notes_array(prediction):
         notes_array[pair[0]-32] = pair[1]
     return notes_array
 
-def contour_vector_from_notes(notes, tbps):
+def contour_vector_from_notes(notes, tbps, include_time=True):
     '''Captures original transformer output notes arrays and translates them to
     contour vectors
 
@@ -370,16 +370,22 @@ def contour_vector_from_notes(notes, tbps):
     #  3-15         | <note pluralities 0-13>
     #  16-24        | <motion [-4, 4]>
     #  25-(tbps+25) | <time bin 1-tbps>
-    contour_vector = contour_to_transformer_output(contour, tbps)
+    contour_vector = contour_to_transformer_output(contour, tbps, include_time)
+    
     return contour_vector
 
-def contour_to_transformer_output(contour, tbps):
+def contour_to_transformer_output(contour, tbps, include_time=True):
     '''Generates transformer output version of contour array
     
     ~~~~ ARGUMENTS ~~~~
         contour (2D numpy array): contour array, note plurality is first row, motion
                                     is second row 
         tbps (int): time bins per second. Determines dimensionality of output_vector
+        include_time (bool): Determines whether onset times are included in output dimension
+            if True, contour_vectors are in following format:
+                [<sos>, <time 0>, <note plurality 0>, <motion 0>, <time 1>, ..., <eos>]
+            if False, 
+                [<sos>, <note plurality 0>, <motion 0>, <note plurality 1>, ..., <eos>]
     ~~~~ RETURNS ~~~~
         contour_vector (1D numpy array):
             [time, note plurality, motion, time, note plurality, motion, ...]
@@ -391,33 +397,58 @@ def contour_to_transformer_output(contour, tbps):
         0            | <sos> 
         1            | <eos> 
         2            | <pad>
-        3-15         | <note pluralities    
-        16-24        | <motion [-4, 4]>    
+        3-15         | <note pluralities    contour (_type_): _description_
+        16-24        | <motion [-4, 4]>    tbps (_type_): _description_
         25-(tbps+24) | <time bin 1-tbps>
     '''
+    # These lambda functions translate contour encoded notes, motions, and times into their
+    # respective vector indices
+    motion_idx = lambda motion: motion + 20     # motion in [-4, 4] -> [16, 24]
+    time_idx = lambda time: time + 25           # time bin in [0,tbps*4] -> [25, tbps*4+24]
+    np_idx = lambda note_p: note_p + 2          # note plurality in [1, 13] -> [3, 15]
+
     # Find indices with note events and create empty vector for contour
     note_events = np.where(contour[0,:] > 0)[0].astype(int)
-    contour_vector = np.zeros(shape=(2+note_events.shape[0]*3))
+    if include_time:
+        contour_vector = np.zeros(shape=(2+note_events.shape[0]*3))
+    else:
+        contour_vector = np.zeros(shape=(2+note_events.shape[0]*2))
     
-    # Populate contour_vector
-    # 0 is already encoded as <sos>
-    motion_idx = lambda motion: motion + 20     # motion in [-4, 4] -> [16, 24]
-    time_idx = lambda time: time + 25           # time bin in [0,24] -> [25, 49]
-    np_idx = lambda note_p: note_p + 2          # note plurality in [1, 13] -> [3, 15]
     for idx, ne in enumerate(list(note_events)):
-        contour_vector[1+(3*idx)] = time_idx(ne)
-        contour_vector[2+(3*idx)] = np_idx(contour[0, ne])
-        contour_vector[3+(3*idx)] = motion_idx(contour[1, ne])
+        if include_time:
+            contour_vector[1+(3*idx)] = time_idx(ne)
+            contour_vector[2+(3*idx)] = np_idx(contour[0, ne])
+            contour_vector[3+(3*idx)] = motion_idx(contour[1, ne])
+        else:
+            contour_vector[1+(2*idx)] = np_idx(contour[0, ne])
+            contour_vector[2+(2*idx)] = motion_idx(contour[1, ne])
     
-    # Populate eos
+    # Populate eos, sos is already encoded as 0 at contour_vector[0]
     contour_vector[-1] = 1
+    
     return contour_vector
 
 class ContourMemoryDataset(ColabMemoryDataset):
     '''Implementation of ColabMemoryDataset but transforms output into contour_vectors
     '''
     def __init__(self, partition_path, max_src_len, max_trg_len, max_examples, 
-                 pad_idx, CHECK_LENGTH=False, tbps=25):
+                 pad_idx, CHECK_LENGTH=False, tbps=25, include_time=True):
+        '''
+
+        Args:
+            partition_path (Path): _description_
+            max_src_len (int): _description_
+            max_trg_len (int): _description_
+            max_examples (int): _description_
+            pad_idx (int): _description_
+            CHECK_LENGTH (bool, optional): _description_. Defaults to False.
+            tbps (int, optional): _description_. Defaults to 25.
+            include_time (bool, optional): Determines format of transformer output,
+                if True:
+                    contour_vectors include onset times
+                if False:
+                    contour_vectors are only note pluralities and motions
+        '''
         self.max_trg_len = max_trg_len
         self.max_src_len = max_src_len
         self.pad_idx = pad_idx
@@ -479,7 +510,7 @@ class ContourMemoryDataset(ColabMemoryDataset):
             # Transform notes into contour_vectors
             # contour_vectors are formatted to be transformer output
             notes = np.load(self.labels[self.data_paths[idx]])
-            notes = contour_vector_from_notes(notes, tbps)
+            notes = contour_vector_from_notes(notes, tbps, include_time)
             notes = self.pad_notes(notes)
             self.specs[idx,...] = spec      # Final data
             self.notes[idx,...] = notes     # Final data
@@ -704,7 +735,7 @@ class Transformer(nn.Module):
         forward_expansion,   # 2048
         dropout,             # 0.1
         max_len,    # 400
-        device,     # GPU or CPU?
+        device,     # GPU or CPU
     ):
         super(Transformer, self).__init__()
 

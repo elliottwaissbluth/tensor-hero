@@ -316,6 +316,48 @@ def predict(model, device, input, sos_idx, max_len, eos_idx = 433):
     
     return prediction, output
 
+def write_song_from_notes_array_to_string(song_metadata, notes_array):
+    '''
+    Takes song_metadata as well as notes_array and writes notes.chart file to outfolder
+
+    ~~~~ ARGUMENTS ~~~~
+    - song_metadata : dict
+        - populates [Song] portion of .chart file
+    - notes_array : numpy array
+        - array of notes with each element corresponding to a 10ms time bin
+    - outfolder : Path
+        - folder to save the chart to
+        - should already exist
+    '''
+    notes_array = list(notes_array.astype(int))
+    chart_string = """""" 
+    # populate '[Song]' portion of file
+    chart_string += ('[Song]\n')
+    chart_string += ('{\n')
+    for k, v in song_metadata.items():
+        if k in ['Name', 'Artist', 'Charter', 'Album', 'Year', 'Genre', 'MediaType', 'MusicStream']:
+            chart_string += ('  ' + k + ' = "' + str(v) + '"\n')
+        else:
+            chart_string += ('  ' + k + ' = ' + str(v) + '\n')
+    chart_string += ('}\n')
+
+    # Populate '[SyncTrack]' portion of file, skip [Events]
+    chart_string += ('[SyncTrack]\n{\n  0 = TS 1\n  0 = B 31250\n}\n[Events]\n{\n}\n')
+
+    # Populate notes in '[ExpertSingle]'
+    chart_string += ('[ExpertSingle]\n{\n')
+
+    # Fill in notes from notes array
+    for idx, note in enumerate(notes_array):
+        if note == 0: # ignore no note is present
+            continue
+        for n in notes_to_chart_strings[note]:
+            chart_string += ('  ' + str(idx) + ' = ' + 'N ' + n + ' 0\n')
+    chart_string += ('}')
+    
+    return chart_string 
+
+
 def write_song_from_notes_array(song_metadata, notes_array, outfolder):
     '''
     Takes song_metadata as well as notes_array and writes notes.chart file to outfolder
