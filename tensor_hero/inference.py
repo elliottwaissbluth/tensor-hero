@@ -109,6 +109,9 @@ def __contour_prediction_to_notes_array(prediction, tbps=25):
     '''
     if type(prediction) == torch.Tensor:
         prediction = prediction.detach().cpu().numpy()
+    
+    if len(list(prediction.shape)) > 1 and prediction.shape[0] == 1:
+        prediction = prediction[0]
 
     #     value           information
     # ____________________________________
@@ -402,6 +405,99 @@ def write_song_from_notes_array(song_metadata, notes_array, outfolder):
 def full_song_prediction(song_path, model, device, sos_idx, max_len, song_metadata, outfolder, 
                          PRINT=False, RETURN_RAW_OUTPUT=False, contour_encoded=False, eos_idx=433):
     '''
+    Reads the song at song_path, uses model to predict notes over time, saves .chart to outfolder
+    and copies song there as well. This outfolder can then be dropped into Clone Hero's song dir.
+    
+    NOTE:
+        - This function is in rough shape right now, needs refined
+        - Model does not predict song in batches, but rather one at a time
+            - Should change this eventually
+    
+    ~~~~ ARGUMENTS ~~~~
+    - song_path : Path
+        - Path to .ogg file
+    - model : PyTorch Model
+        - Model used to predict notes
+        - Currently expected to be Transformer
+    - device : str
+        - cuda or cpu
+    - sos_idx : int
+        - start of sequence index
+        - 432 for simplified notes
+    - max_len : int
+        - max output sequence length
+    - song_metadata : dict
+        - populates [Song] portion of chart file
+    - outfolder : Path
+        - folder to save song and .chart file to
+    '''
+    # First, get the song split up into spectrograms 4 second segments
+    full_spec = m1_song_preprocessing(song_path)
+    # for i in range(full_spec.shape[0]):
+        # specshow(full_spec[i,...])
+        # plt.show()
+    
+    # Predict each 4 second segment, populate notes array along the way
+    notes_array = np.zeros(full_spec.shape[0]*full_spec.shape[2])
+    for i in range(full_spec.shape[0]):
+        print(f'predicting segment {i}/{full_spec.shape[0]}')
+        prediction, raw_output = predict(model, device, full_spec[i,...], sos_idx, max_len, eos_idx=eos_idx)
+        if PRINT:
+            print('m1 notes tensor: {}'.format(prediction))
+        if not contour_encoded:
+            notes_array[(i*full_spec.shape[2]):((i+1)*full_spec.shape[2])] = m1_tensor_to_note_array(prediction)
+        else:
+            notes_array[(i*full_spec.shape[2]):((i+1)*full_spec.shape[2])] = __contour_prediction_to_notes_array(prediction)
+
+    # Write the outfolder
+    if not os.path.isdir(outfolder):
+        os.mkdir(outfolder)
+    # Write the song into the outfolder
+    write_song_from_notes_array(song_metadata, notes_array, outfolder)
+    # Copy the audio file into the outfolder
+    shutil.copyfile(str(song_path), str(outfolder / 'song.ogg'))
+    if not RETURN_RAW_OUTPUT:
+        return notes_array
+    if RETURN_RAW_OUTPUT:
+        return notes_array, raw_output
+
+def onset_model_preprocessing(song_path, max_src_len):
+    '''
+    Loads the song (song.ogg) at song_path and converts it to an array of spectrograms slices
+    with shape = (<song length in seconds / 4>, frequency (512), time (7), max_src_len).
+    If song length is not divisible by 4, pads the end of the song
+
+    ~~~~ ARGUMENTS ~~~~
+    - song_path : Path or String
+        - path to song
+    - max_src_len (int): maximum number of windowed spectrograms fed to model (probably 103)
+    
+    ~~~~ RETURNS ~~~~
+    - full_spec : numpy array
+        - full spectrogram preprocessed for OnsetTransformer (shape described above)
+    '''
+    spec = compute_mel_spectrogram(song_path)
+
+    # Pad so the length is divisible by 400
+    spec = np.pad(spec, ((0,0),(0,400-(spec.shape[1]%400))), mode='constant', constant_values=-80.0)
+    spec = (spec+80)/80  # normalize
+
+    # Populate full spectrogram
+    full_spec = np.zeros(shape=(int(spec.shape[1]/400), 512, 400))
+    assert (spec.shape[1]/400)%1 < 1e-8, 'Error: Spectrogram has been padded to the wrong length'
+    for i in range(int(spec.shape[1]/400)):
+        full_spec[i,...] = spec[:,(i*400):((i+1)*400)]
+        
+    # Compute onsets for each of the 400ms spectrogram frames in full_spec
+    
+
+    return full_spec
+
+def full_song_prediction_onset(song_path, model, device, sos_idx, max_len, song_metadata, outfolder, 
+                         PRINT=False, RETURN_RAW_OUTPUT=False, contour_encoded=False, eos_idx=433):
+    '''
+    Specified for OnsetTransformer
+    
     Reads the song at song_path, uses model to predict notes over time, saves .chart to outfolder
     and copies song there as well. This outfolder can then be dropped into Clone Hero's song dir.
     
