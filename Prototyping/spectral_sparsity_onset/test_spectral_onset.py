@@ -1,10 +1,8 @@
 import sys
 from pathlib import Path
-sys.path.insert(1, str(Path.cwd()))
 from tensor_hero.preprocessing.audio import ninos, onset_select
 from tensor_hero.preprocessing.chart import chart2tensor
 from tensor_hero.preprocessing.data import __remove_release_keys, __remove_modifiers
-from tensor_hero.visualization import plot_chart
 import librosa
 from mir_eval.onset import f_measure
 from tqdm import tqdm

@@ -2,11 +2,16 @@ import torch
 import numpy as np
 from tqdm import tqdm
 import os
+import sys #DEBUG
 import shutil
+from pathlib import Path
+import librosa
+import librosa.display #DEBUG
+import matplotlib.pyplot as plt #DEBUG
 from tensor_hero.preprocessing.audio import compute_mel_spectrogram
 from tensor_hero.preprocessing.data import decode_contour
 from tensor_hero.model import Transformer
-from pathlib import Path
+from tensor_hero.onset import get_10ms_onset_frames
 
 '''
 This script was previously implemented as m1_postprocessing.py
@@ -90,7 +95,7 @@ def __single_prediction_to_notes_array(prediction):
         notes_array[pair[0]-32] = pair[1]
     return notes_array
 
-def __contour_prediction_to_notes_array(prediction, tbps=25):
+def __contour_prediction_to_notes_array(prediction, tbps=25, include_time=True, onsets=None):
     '''
     Takes a single contour prediction from the transformer and translates it to a notes array
     of length 400.
@@ -99,9 +104,14 @@ def __contour_prediction_to_notes_array(prediction, tbps=25):
     -   prediction (numpy Array, shape=(<max_trg_len>,)):
             -   Prediction from the transformer, should be a single list of max indices
                 from transformer prediction. 
-            -   Expected to be formatted as
+            -   If include_time = True, expected to be formatted as
                 [<sos>, time, note plurality, motion, etc., <eos>, <pad>, <pad>, etc.]
+            -   If include_time = False, expected to be formatted as
+                [<sos>, note plurality, motion, etc., <eos>, <pad>, <pad>, etc.]
     -   tbps (int): time bins per second of predicted notes
+    -   include_time (bool): Whether the prediction is pure notes or includes time
+    -   onsets (list of ints): Onsets that the model made a prediction for
+            -   Only useful when include_time = False
         
     ~~~~ RETURNS ~~~~
     -   notes_array (Numpy Array, shape = (400,)):
@@ -123,23 +133,40 @@ def __contour_prediction_to_notes_array(prediction, tbps=25):
     # 25-(tbps*4+24) | <time bin 1-tbps*4>
 
     note_vals = list(range(3, 16))            # Note pluralities
-    time_vals = list(range(25, tbps*4+24))    # Corresponding to times
+    time_vals = list(range(25, tbps*4+25))    # Corresponding to times
     motion_vals = list(range(16, 25))         # Motion in [-4,4]
     
-    # Loop through the array 3 elements at a time
+    # Loop through the array 3 elements at a time if time is included
     pairs = []
-    for i in range(prediction.shape[0]-2):
-        pair = (prediction[i], prediction[i+1], prediction[i+2]) # Take predicted notes as couples
-        if pair[0] in time_vals and pair[1] in note_vals and pair[2] in motion_vals:
-            pairs.append(pair)  # Append if pair follows (time, note) pattern
+    if include_time:
+        for i in range(prediction.shape[0]-2):
+            pair = (prediction[i], prediction[i+1], prediction[i+2]) # Take predicted notes as couples
+            if pair[0] in time_vals and pair[1] in note_vals and pair[2] in motion_vals:
+                pairs.append(pair)  # Append if pair follows (time, note plurality, motion) pattern
+    else:
+        for i in range(prediction.shape[0]-1):
+            pair = (prediction[i], prediction[i+1])  # Take predicted notes as couples
+            if  pair[0] in note_vals and pair[1] in motion_vals:
+                pairs.append(pair)  # Append if pair follows (note plurality, motion) pattern
+        
 
     # Create contour from pairs
     expansion_factor = 100/tbps
     contour = np.zeros(shape=(2, 400))
-    for pair in pairs:
-        index = min(round((pair[0]-25)*expansion_factor), 400)
-        contour[0, index] = pair[1]-2    # note plurality
-        contour[1, index] = pair[2]-20   # motion
+    if include_time:  # Infer time from predicted onset
+        for pair in pairs:
+            index = min(round((pair[0]-25)*expansion_factor), 400)
+            contour[0, index] = pair[1]-2    # note plurality
+            contour[1, index] = pair[2]-20   # motion
+    else: # Infer time explicitly from onsets
+        for idx, pair in enumerate(pairs):
+            try:
+                index = onsets[idx]
+            except IndexError:
+                print(f'Model predicted more notes than onsets')
+                break
+            contour[0, index] = pair[0]-2    # note plurality
+            contour[1, index] = pair[1]-20   # motion
     
     # Create notes array from contour
     notes_array = decode_contour(contour)
@@ -461,40 +488,153 @@ def full_song_prediction(song_path, model, device, sos_idx, max_len, song_metada
     if RETURN_RAW_OUTPUT:
         return notes_array, raw_output
 
-def onset_model_preprocessing(song_path, max_src_len):
+def spec_slices_from_onsets(spec, onsets, max_src_len, window=3):
+        '''Takes timesteps where notes are present and returns a tensor of spectrogram
+        slices at those timesteps, plus window frames on either side
+
+        Args:
+            spec (torch.Tensor, dtype=torch.float, shape=(512,400)):
+                - log-mel spectrogram, 512 frequency bins, 400 time bins
+            onsets (list of ints): 
+                - Contains the 10ms frames where onsets occur in spec
+            max_src_len (int): Number of frames to pad spectrogram with
+            window (int):
+                - The number of time frames on each side of an onset to pull from the spectrogram
+                - Default is 3, 30ms on each side.
+        
+        Returns:
+            spec (torch.Tensor, dtype=torch.float, shape = (512, 2*window+1, (max_trg_len-3)/2)):
+                - (max_trg_len-3)/2 is the maximum number of notes in a sequence
+                
+        '''
+        # Pad spec on either side to avoid window overflow
+        big_spec = torch.zeros(size=(512, 400+2*window+1))
+        big_spec[:,window:(400+window)] = spec[:,:400]
+        
+        # Create empty tensor for spectrogram slices
+        specs = torch.zeros(size=(512, 2*window+1, max_src_len), dtype=torch.float)
+
+        # Slice spectrogram and put it into specs
+        for idx, onset in enumerate(onsets):
+            onset = int(onset+window)  # To index properly in big_spec
+            spec_slice = torch.zeros(size=(512, 2*window+1), dtype=torch.float)
+            spec_slice[:,:window] = big_spec[:,(onset-window):onset]
+            spec_slice[:,(window+1):] = big_spec[:,(onset+1):(onset+window+1)]
+            spec_slice[:,window] = big_spec[:,onset]
+            specs[:,:,idx] = spec_slice 
+        
+        return specs
+        
+def onset_model_preprocessing(song_path, max_src_len, window=3, 
+                              onset_params = [10, 1, 1, 8, 10, 1.0], _print=False):
     '''
     Loads the song (song.ogg) at song_path and converts it to an array of spectrograms slices
-    with shape = (<song length in seconds / 4>, frequency (512), time (7), max_src_len).
+    with shape = (<song length in seconds / 4>, frequency (512), time (2*window+1), max_src_len).
     If song length is not divisible by 4, pads the end of the song
 
     ~~~~ ARGUMENTS ~~~~
     - song_path : Path or String
         - path to song
     - max_src_len (int): maximum number of windowed spectrograms fed to model (probably 103)
+    - window (int): Window size around computed onset to use for each spectrogram slice
+    - onset_params (list): [w1, w2, w3, w4, w5, delta] for get_10ms_onset_frames
+    - _print (bool): If True, prints the predicted onset
     
     ~~~~ RETURNS ~~~~
-    - full_spec : numpy array
-        - full spectrogram preprocessed for OnsetTransformer (shape described above)
+    - spec_slices (torch tensor, dtype=torch.float):
+        - full spectrograms preprocessed for OnsetTransformer (shape described above)
+    - onsets (list of lists of ints):
+        - Onset predictions for each sice
     '''
+    print('Loading song...')
     spec = compute_mel_spectrogram(song_path)
+    audio, sr = librosa.load(song_path)
 
     # Pad so the length is divisible by 400
     spec = np.pad(spec, ((0,0),(0,400-(spec.shape[1]%400))), mode='constant', constant_values=-80.0)
     spec = (spec+80)/80  # normalize
 
-    # Populate full spectrogram
+    # Pad the audio so it's divisible by sr*4 (i.e. 4 seconds to match spectrogram padding)
+    audio = np.pad(audio, (0, (sr*4) - audio.shape[0]%(sr*4)), 'constant', constant_values=0)
+
+    # Populate full spectrogram and compute onsets
+    print('computing onsets...')
     full_spec = np.zeros(shape=(int(spec.shape[1]/400), 512, 400))
     assert (spec.shape[1]/400)%1 < 1e-8, 'Error: Spectrogram has been padded to the wrong length'
-    for i in range(int(spec.shape[1]/400)):
-        full_spec[i,...] = spec[:,(i*400):((i+1)*400)]
-        
-    # Compute onsets for each of the 400ms spectrogram frames in full_spec
+    onsets = []  # Holds lists of onsets for each song frame
+    for i in tqdm(range(int(spec.shape[1]/400))):
+        full_spec[i,...] = spec[:,(i*400):((i+1)*400)] # populate spectrogram
+        onset = get_10ms_onset_frames(audio, sr, start=(i*4), end=((i+1)*4), w1=onset_params[0], 
+                                      w2=onset_params[1], w3=onset_params[2], w4=onset_params[3],
+                                      w5=onset_params[4], delta=onset_params[5])
+        onsets.append(onset)
+    full_spec = torch.tensor(full_spec, dtype=torch.float)  # convert to tensor
     
+    if _print:
+        print(onsets)
+        
+    # Create empty tensor to hold spec slices
+    spec_slices = torch.zeros(size=(int(spec.shape[1]/400), 512, 2*window+1, max_src_len), dtype=torch.float)
+    
+    # Populate spec_slices one four second chunk at a time
+    for idx, onset_slice in enumerate(onsets):
+        spec_slices[idx,...] = spec_slices_from_onsets(full_spec[idx,...], onset_slice, max_src_len, window)
 
-    return full_spec
+    return spec_slices, onsets
 
-def full_song_prediction_onset(song_path, model, device, sos_idx, max_len, song_metadata, outfolder, 
-                         PRINT=False, RETURN_RAW_OUTPUT=False, contour_encoded=False, eos_idx=433):
+def onset_model_predict(model, device, input, sos_idx, eos_idx, max_src_len):
+    '''
+    Predicts the output sequence for a segment of spectrogram slices, used for OnsetTransformer
+
+    ~~~~ ARGUMENTS ~~~~
+    - model : PyTorch model
+        - OnsetTransformer architecture
+        - Model should already be on device
+    - device : str
+        - cuda or cpu
+    - input (torch.tensor)
+        - spectrogram slices from a single 4 second segment
+        - shape = (512, (2*window+1), max_src_len)
+    - sos_idx (int):
+        - start of sequence index, (0)
+    - eos_idx (int):
+        - end of sequence index, (1)
+    - max_src_len (int):
+        - max input sequence length (103)
+    - max_trg_len (int):
+        - max output sequence length (103)
+
+    ~~~~ RETURNS ~~~~
+    - prediction : torch tensor
+        - predicted output from model
+    '''
+    model.eval()
+
+    # Put input on GPU and add batch dimension
+    input = input.unsqueeze(0)
+    input = input.to(device)
+
+    # Create initial input sequence, i.e. [<sos>]
+    prediction = torch.tensor(np.array([sos_idx])).to(device)
+    prediction = prediction.unsqueeze(0) # Add batch dimension
+
+    # Get model output and construct prediction
+    for i in range(max_src_len):
+
+        # Get output
+        output = model(input, prediction)
+        pred = torch.tensor([torch.argmax(output[0,-1,:]).item()]).unsqueeze(0).to(device)
+        
+        # Stop predicting once <eos> is output
+        if pred == eos_idx:
+            break
+        prediction = torch.cat((prediction, pred), dim=1)
+    
+    return prediction, output
+
+def full_song_prediction_onset(song_path, model, device, sos_idx, max_src_len, max_trg_len, 
+                               song_metadata, outfolder, PRINT=False, RETURN_RAW_OUTPUT=False, 
+                               eos_idx=1, onset_params = [10, 1, 1, 8, 10, 1.0]):
     '''
     Specified for OnsetTransformer
     
@@ -517,30 +657,30 @@ def full_song_prediction_onset(song_path, model, device, sos_idx, max_len, song_
     - sos_idx : int
         - start of sequence index
         - 432 for simplified notes
-    - max_len : int
-        - max output sequence length
+    - max_src_len: int
+        - max input sequence length (103)
+    - max_trg_len : int
+        - max output sequence length (103)
     - song_metadata : dict
         - populates [Song] portion of chart file
     - outfolder : Path
         - folder to save song and .chart file to
     '''
     # First, get the song split up into spectrograms 4 second segments
-    full_spec = m1_song_preprocessing(song_path)
-    # for i in range(full_spec.shape[0]):
-        # specshow(full_spec[i,...])
-        # plt.show()
+    spec_slices, onsets = onset_model_preprocessing(str(song_path), max_src_len=103,
+                                                    onset_params=onset_params, _print=PRINT)
     
     # Predict each 4 second segment, populate notes array along the way
-    notes_array = np.zeros(full_spec.shape[0]*full_spec.shape[2])
-    for i in range(full_spec.shape[0]):
-        print(f'predicting segment {i}/{full_spec.shape[0]}')
-        prediction, raw_output = predict(model, device, full_spec[i,...], sos_idx, max_len, eos_idx=eos_idx)
+    print('prediction notes...')
+    notes_array = np.zeros(spec_slices.size()[0]*400)
+    for i in tqdm(range(spec_slices.size()[0])):
+        prediction, raw_output = onset_model_predict(model, device, spec_slices[i,...], sos_idx, 
+                                               eos_idx, max_src_len)
         if PRINT:
             print('m1 notes tensor: {}'.format(prediction))
-        if not contour_encoded:
-            notes_array[(i*full_spec.shape[2]):((i+1)*full_spec.shape[2])] = m1_tensor_to_note_array(prediction)
-        else:
-            notes_array[(i*full_spec.shape[2]):((i+1)*full_spec.shape[2])] = __contour_prediction_to_notes_array(prediction)
+        notes_array[(i*400):((i+1)*400)] = __contour_prediction_to_notes_array(prediction,
+                                                                               include_time=False,
+                                                                               onsets=onsets)
 
     # Write the outfolder
     if not os.path.isdir(outfolder):
