@@ -8,7 +8,7 @@ if not sys.warnoptions:
     import warnings
     warnings.simplefilter("ignore")
 
-def ninos(audio, sr, gamma=0.94):
+def ninos(audio, sr, spec=None, gamma=0.94):
     '''Calculates Normalized Identifying Note Onsets based on Spectral Sparsity (NINOS)
     over time for audio.
    
@@ -38,8 +38,9 @@ def ninos(audio, sr, gamma=0.94):
     else:
         raise ValueError(f'ERROR: sr = {sr}, sr must be either 22050 or 44100')    
 
-    # Compute spectrogram
-    spec = np.abs(librosa.stft(audio, n_fft, hop_length))
+    if spec is None:
+        # Compute spectrogram if not provided
+        spec = np.abs(librosa.stft(audio, n_fft, hop_length))
     
     # Order by magnitude within each time bin
     spec = np.sort(spec, axis=0)
