@@ -8,7 +8,7 @@ from pathlib import Path
 import librosa
 import librosa.display #DEBUG
 import matplotlib.pyplot as plt #DEBUG
-from tensor_hero.preprocessing.audio import compute_mel_spectrogram
+from tensor_hero.preprocessing.audio import compute_mel_spectrogram, compute_mel_spectrogram_from_audio
 from tensor_hero.preprocessing.data import decode_contour
 from tensor_hero.model import Transformer
 from tensor_hero.onset import get_10ms_onset_frames
@@ -525,8 +525,8 @@ def spec_slices_from_onsets(spec, onsets, max_src_len, window=3):
         
         return specs
         
-def onset_model_preprocessing(song_path, max_src_len, window=3, 
-                              onset_params = [10, 1, 1, 8, 10, 1.0], _print=False):
+def onset_model_preprocessing(song_path, max_src_len, window=3, odf='odf', hop_len=441, p=0.99, 
+                              gamma=0.94, onset_params = [10, 1, 1, 8, 10, 1.0], _print=False):
     '''
     Loads the song (song.ogg) at song_path and converts it to an array of spectrograms slices
     with shape = (<song length in seconds / 4>, frequency (512), time (2*window+1), max_src_len).
@@ -547,26 +547,27 @@ def onset_model_preprocessing(song_path, max_src_len, window=3,
         - Onset predictions for each sice
     '''
     print('Loading song...')
-    spec = compute_mel_spectrogram(song_path)
     audio, sr = librosa.load(song_path)
+    spec = compute_mel_spectrogram_from_audio(audio, sr)
 
     # Pad so the length is divisible by 400
     spec = np.pad(spec, ((0,0),(0,400-(spec.shape[1]%400))), mode='constant', constant_values=-80.0)
-    spec = (spec+80)/80  # normalize
+    spec_norm = (spec+80)/80  # normalize
 
     # Pad the audio so it's divisible by sr*4 (i.e. 4 seconds to match spectrogram padding)
     audio = np.pad(audio, (0, (sr*4) - audio.shape[0]%(sr*4)), 'constant', constant_values=0)
 
     # Populate full spectrogram and compute onsets
     print('computing onsets...')
-    full_spec = np.zeros(shape=(int(spec.shape[1]/400), 512, 400))
-    assert (spec.shape[1]/400)%1 < 1e-8, 'Error: Spectrogram has been padded to the wrong length'
+    full_spec = np.zeros(shape=(int(spec_norm.shape[1]/400), 512, 400))
+    full_spec_unnormalized = np.zeros_like(full_spec)
     onsets = []  # Holds lists of onsets for each song frame
     for i in tqdm(range(int(spec.shape[1]/400))):
-        full_spec[i,...] = spec[:,(i*400):((i+1)*400)] # populate spectrogram
-        onset = get_10ms_onset_frames(audio, sr, start=(i*4), end=((i+1)*4), w1=onset_params[0], 
+        full_spec[i,...] = spec_norm[:,(i*400):((i+1)*400)]         # populate spectrogram for model
+        full_spec_unnormalized[i,...] = spec[:,(i*400):((i+1)*400)] # populate spectrogram for onsets
+        onset = get_10ms_onset_frames(audio=None, sr=None, odf=odf, hop_len=hop_len, p=p, gamma=gamma, w1=onset_params[0], 
                                       w2=onset_params[1], w3=onset_params[2], w4=onset_params[3],
-                                      w5=onset_params[4], delta=onset_params[5])
+                                      w5=onset_params[4], delta=onset_params[5], spec=full_spec_unnormalized[i,...])
         onsets.append(onset)
     full_spec = torch.tensor(full_spec, dtype=torch.float)  # convert to tensor
     
@@ -634,7 +635,8 @@ def onset_model_predict(model, device, input, sos_idx, eos_idx, max_src_len):
 
 def full_song_prediction_onset(song_path, model, device, sos_idx, max_src_len, max_trg_len, 
                                song_metadata, outfolder, PRINT=False, RETURN_RAW_OUTPUT=False, 
-                               eos_idx=1, onset_params = [10, 1, 1, 8, 10, 1.0]):
+                               eos_idx=1, onset_params = [10, 1, 1, 8, 10, 1.0], odf='odf',
+                               hop_len=441, p=0.99, gamma=0.94):
     '''
     Specified for OnsetTransformer
     
@@ -667,11 +669,12 @@ def full_song_prediction_onset(song_path, model, device, sos_idx, max_src_len, m
         - folder to save song and .chart file to
     '''
     # First, get the song split up into spectrograms 4 second segments
-    spec_slices, onsets = onset_model_preprocessing(str(song_path), max_src_len=103,
-                                                    onset_params=onset_params, _print=PRINT)
-    
+    spec_slices, onsets = onset_model_preprocessing(str(song_path), max_src_len=103, odf=odf,
+                                                    onset_params=onset_params, _print=PRINT,
+                                                    hop_len=hop_len, p=p, gamma=gamma)
+
     # Predict each 4 second segment, populate notes array along the way
-    print('prediction notes...')
+    print('predicting notes...')
     notes_array = np.zeros(spec_slices.size()[0]*400)
     for i in tqdm(range(spec_slices.size()[0])):
         prediction, raw_output = onset_model_predict(model, device, spec_slices[i,...], sos_idx, 
@@ -680,7 +683,7 @@ def full_song_prediction_onset(song_path, model, device, sos_idx, max_src_len, m
             print('m1 notes tensor: {}'.format(prediction))
         notes_array[(i*400):((i+1)*400)] = __contour_prediction_to_notes_array(prediction,
                                                                                include_time=False,
-                                                                               onsets=onsets)
+                                                                               onsets=onsets[i])
 
     # Write the outfolder
     if not os.path.isdir(outfolder):

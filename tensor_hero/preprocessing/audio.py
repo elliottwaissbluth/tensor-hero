@@ -17,10 +17,32 @@ def compute_mel_spectrogram(song_path):
         -   each time slice represents 10 milliseconds
         -   log-scale, so max(spec) = 0, min(spec) = -80
     '''
-    data, sr = librosa.load(str(song_path))
-    resampled = librosa.resample(data, sr, 44100)
+    audio, sr = librosa.load(str(song_path))
+    resampled = librosa.resample(audio, sr, 44100)
     spec = librosa.feature.melspectrogram(resampled, 44100, n_fft=2048*2, hop_length=441, n_mels=512, power=2, fmax = sr/2)
     spec = librosa.power_to_db(spec, ref=np.max)
+    return spec
+
+def compute_mel_spectrogram_from_audio(audio, sr):
+    resampled = librosa.resample(audio, sr, 44100)
+    spec = librosa.feature.melspectrogram(resampled, 44100, n_fft=2048*2, hop_length=441, n_mels=512, power=2, fmax = sr/2)
+    spec = librosa.power_to_db(spec, ref=np.max)
+    return spec
+
+def filter_spec_by_amplitude(spec, p):
+    '''Filters out (1-p)% of elements with the smallest values from spec
+
+    Args:
+        spec (2D numpy array): spectrogram or other 2D matrix
+        p (float in [0, 1]): desired portion of spec to keep
+    
+    Returns:
+        (2D numpy array): spec with low values filtered out
+    '''
+    num_elements = np.size(spec)
+    num_to_keep = int(p*num_elements)
+    t_val = np.flip(np.sort(spec, axis=None))[num_to_keep]  # Threshold
+    spec[spec < t_val] = np.min(spec)
     return spec
 
 def ninos(audio, sr, gamma=0.94):

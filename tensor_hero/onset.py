@@ -4,6 +4,7 @@ from mir_eval.onset import f_measure
 import numpy as np
 import matplotlib.pyplot as plt
 import math
+from tensor_hero.preprocessing.audio import compute_mel_spectrogram_from_audio, filter_spec_by_amplitude
 if not sys.warnoptions:
     import warnings
     warnings.simplefilter("ignore")
@@ -153,9 +154,8 @@ def onset_times_to_bins(onset_times):
     onset_times = [round(x*100) for x in onset_times]
     return onset_times
 
-def get_10ms_onset_frames(audio, sr, w1=10, w2=1, w3=1, w4=8, w5=10, delta=1.0,
-                          start=-1, end=-1):
-    '''Takes raw audio and uses spectral sparsity onset detection to predict onsets, which
+def get_10ms_onset_frames(audio, sr, odf, hop_len, p, gamma, w1=10, w2=1, w3=1, w4=8, w5=10, delta=1.0, spec=None):
+    '''Takes raw audio and uses desired odf function and parameters to predict onsets, which
     are returned as 10ms time frames relative to start and end (full audio if start and end
     aren't specified)
 
@@ -165,6 +165,7 @@ def get_10ms_onset_frames(audio, sr, w1=10, w2=1, w3=1, w4=8, w5=10, delta=1.0,
     Args:
         audio (1D numpy array): Raw audio waveform
         sr (int): sample rate
+        odf (str): desired onset detection function
         w1 (int, optional): see onset_select(). Defaults to 10.
         w2 (int, optional): see onset_select(). Defaults to 1.
         w3 (int, optional): see onset_select(). Defaults to 1.
@@ -179,16 +180,70 @@ def get_10ms_onset_frames(audio, sr, w1=10, w2=1, w3=1, w4=8, w5=10, delta=1.0,
     Returns:
         onset_time_bins (list of ints): predicted 10ms time bins corresponding to onsets
     '''
-    # Get odf
-    if start <= 0 and end <= 0:
-        odf, _, hop_len = ninos(audio, sr)
-    else:
-        assert start >= 0 and end >= start and end*sr <= audio.shape[0]
-        odf, _, hop_len = ninos(audio[sr*start:sr*end], sr)
+    assert odf in ['odf', 'energy', 'odf_energy', 'log_energy_novelty', 'spectral_novelty',
+                   'odf_unnormalized', 'odf_sum_energy', 'log_energy_novelty_mult_odf_energy',
+                   'd_energy', 'd_energy_mult_energy'], f'ERROR: {odf} is not a valid option'
+            
+    # Get spectrogram
+    if spec is None:
+        spec = compute_mel_spectrogram_from_audio(audio, sr)
+    spec = filter_spec_by_amplitude(spec, p=p)
     
+    if odf == 'odf':
+        o = ninos(audio, sr, spec=spec, gamma=gamma)
+        o = -(o - np.min(o)) / np.max(o - np.min(o)) + 1
+    elif odf == 'odf_unnormalized':
+        o = ninos(audio, sr, spec=spec, gamma=gamma)
+        o = -o
+    elif odf == 'energy':
+        o = librosa.feature.rms(S=spec, frame_length=1022)[0]
+        o = -(o - np.min(o)) / np.max(o - np.min(o)) + 1
+    elif odf == 'odf_energy':
+        o = ninos(audio, sr, spec=spec, gamma=gamma)
+        o = -(o - np.min(o)) / np.max(o - np.min(o)) + 1
+        e = librosa.feature.rms(S=spec, frame_length=1022)[0]
+        e = -(e - np.min(e)) / np.max(e - np.min(e)) + 1
+        o = np.multiply(o, e)
+        o = (o - np.min(o)) / np.max(o - np.min(o))
+    elif odf == 'log_energy_novelty':
+        e = librosa.feature.rms(S=spec, frame_length=1022)[0]
+        log_energy = np.log1p(10*e)
+        log_energy_diff = np.zeros_like(log_energy)
+        log_energy_diff[1:] = np.diff(log_energy)
+        o = np.max([np.zeros_like(log_energy_diff), log_energy_diff], axis=0)
+        o = (o - np.min(o)) / np.max(o - np.min(o))
+    elif odf == 'spectral_novelty':
+        o = librosa.onset.onset_strength(S=spec)
+        o = (o - np.min(o)) / np.max(o - np.min(o))
+    elif odf == 'odf_sum_energy':
+        o = ninos(audio, sr, spec=spec, gamma=gamma)
+        e = librosa.feature.rms(S=spec, frame_length=1022)[0]
+        o = o+e
+        o = -(o - np.min(o)) / np.max(o - np.min(o)) + 1
+    elif odf == 'log_energy_novelty_mult_odf_energy':
+        e = librosa.feature.rms(S=spec, frame_length=1022)[0]
+        log_energy = np.log1p(10*e)
+        log_energy_diff = np.zeros_like(log_energy)
+        log_energy_diff[1:] = np.diff(log_energy)
+        log_energy_novelty = np.max([np.zeros_like(log_energy_diff), log_energy_diff], axis=0)
+        o = ninos(audio, sr, spec=spec, gamma=gamma)
+        o = np.multiply(o, e)
+        o = np.multiply(o, log_energy_novelty)
+        o = (o - np.min(o)) / np.max(o - np.min(o))
+    elif odf == 'd_energy':
+        e = librosa.feature.rms(S=spec, frame_length=1022)[0]
+        o = librosa.feature.delta(e)
+        o = -(o - np.min(o)) / np.max(o - np.min(o)) + 1
+    elif odf == 'd_energy_mult_energy':
+        e = librosa.feature.rms(S=spec, frame_length=1022)[0]
+        e = -(e - np.min(e)) / np.max(e - np.min(e)) + 1
+        o = librosa.feature.delta(e)
+        o = -(o - np.min(o)) / np.max(o - np.min(o)) + 1
+        o = np.multiply(o, e)
+        o = (o - np.min(o)) / np.max(o - np.min(o))
     # Peak pick
-    onsets = onset_select(odf, w1, w2, w3, w4, w5, delta, plot=False)
-    onset_times = onset_frames_to_time(onsets, sr, hop_len)
+    onsets = onset_select(o, w1, w2, w3, w4, w5, delta, plot=False)
+    onset_times = onset_frames_to_time(onsets, sr=44100, hop_len=hop_len)
     onset_time_bins = onset_times_to_bins(onset_times)  # convert to 10ms time bins
     
     return onset_time_bins
