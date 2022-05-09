@@ -60,7 +60,8 @@ def ninos(audio, sr, spec=None, gamma=0.94):
     return ninos, J, hop_length
 
 def squeeze_idx(idx, min, max):
-    '''Helper function that ensures the indices of the windows stays between 0 and max.
+    '''Helper function  for onset_select () that ensures the indices of the windows 
+    stays between 0 and max.
    
     Args:
         idx (int): Candidate index
